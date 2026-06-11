@@ -71,8 +71,18 @@ import { HealthController } from './health.controller';
       useFactory: (config: ConfigService) => {
         const url = config.get<string>('redis.url');
         if (url) {
-          // ioredis приймає URL-рядок (redis:// або rediss://)
-          return { connection: url as any };
+          // ВАЖЛИВО: BullMQ НЕ парсить рядок-URL (робить Object.assign і падає
+          // на 127.0.0.1:6379). Тому розбираємо URL у нормальний обʼєкт.
+          const u = new URL(url);
+          return {
+            connection: {
+              host: u.hostname,
+              port: Number(u.port) || 6379,
+              username: u.username ? decodeURIComponent(u.username) : undefined,
+              password: u.password ? decodeURIComponent(u.password) : undefined,
+              ...(u.protocol === 'rediss:' ? { tls: {} } : {}),
+            },
+          };
         }
         return {
           connection: {
