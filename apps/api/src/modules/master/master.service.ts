@@ -117,7 +117,7 @@ export class MasterService {
   private static readonly ALLOWED_UPDATE_FIELDS = [
     'fullName', 'phone', 'avatarUrl', 'bio', 'city', 'specialties', 'theme',
     'reminder1Enabled', 'reminder1Hours', 'reminder2Enabled', 'reminder2Hours',
-    'autoConfirm', 'cancellationHours',
+    'autoConfirm', 'cancellationHours', 'maxBookingsPerDayPerClient',
     'defaultWorkStart', 'defaultWorkEnd', 'defaultSlotDuration', 'defaultBreakMinutes',
   ] as const;
 

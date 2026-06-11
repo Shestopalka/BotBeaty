@@ -19,6 +19,7 @@ export interface Master {
   // Booking
   autoConfirm: boolean;
   cancellationHours: number;
+  maxBookingsPerDayPerClient: number;
 
   // Slot defaults
   defaultWorkStart: string;

@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, IsNull } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -27,9 +27,6 @@ export interface CreateAppointmentDto {
 
 @Injectable()
 export class AppointmentService {
-  // Макс. активних (pending/confirmed) записів на одного клієнта в одного майстра.
-  private static readonly MAX_ACTIVE_PER_CLIENT = 3;
-
   constructor(
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
@@ -100,18 +97,34 @@ export class AppointmentService {
         throw new BadRequestException('Запис недоступний');
       }
 
-      // Ліміт активних записів на клієнта — щоб один клієнт не забронював усі слоти.
-      const activeCount = await manager.getRepository(Appointment).count({
-        where: {
-          clientId: client.id,
-          masterId: dto.masterId,
-          status: In([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
-          deletedAt: IsNull(),
-        },
+      // Ліміт записів на клієнта НА ДЕНЬ — налаштовується майстром.
+      // Рахуємо активні (pending/confirmed) записи цього клієнта на той самий
+      // КИЇВСЬКИЙ день, що й обраний слот.
+      const masterLimitRow = await manager.getRepository(Master).findOne({
+        where: { id: dto.masterId },
+        select: ['maxBookingsPerDayPerClient'],
       });
-      if (activeCount >= AppointmentService.MAX_ACTIVE_PER_CLIENT) {
+      const perDayLimit = masterLimitRow?.maxBookingsPerDayPerClient ?? 1;
+      const sameDayCount = await manager
+        .getRepository(Appointment)
+        .createQueryBuilder('apt')
+        .innerJoin('apt.slot', 's')
+        .where('apt.clientId = :clientId', { clientId: client.id })
+        .andWhere('apt.masterId = :masterId', { masterId: dto.masterId })
+        .andWhere('apt.status IN (:...st)', {
+          st: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED],
+        })
+        .andWhere('apt.deletedAt IS NULL')
+        .andWhere(
+          `(s."startAt" AT TIME ZONE 'Europe/Kyiv')::date = (:slotStart::timestamptz AT TIME ZONE 'Europe/Kyiv')::date`,
+          { slotStart: slot.startAt.toISOString() },
+        )
+        .getCount();
+      if (sameDayCount >= perDayLimit) {
         throw new BadRequestException(
-          `Можна мати щонайбільше ${AppointmentService.MAX_ACTIVE_PER_CLIENT} активних записів. Дочекайтесь візиту або скасуйте зайвий.`,
+          perDayLimit === 1
+            ? 'На цей день у вас уже є запис. Оберіть інший день.'
+            : `На цей день можна мати щонайбільше ${perDayLimit} записів.`,
         );
       }
 

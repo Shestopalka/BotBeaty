@@ -57,6 +57,14 @@ export class AppointmentCallbackHandler {
 
     await this.updateStatus(apt, AppointmentStatus.CONFIRMED, masterId);
 
+    // Нотифікуємо клієнта про підтвердження (раніше тут цього не було —
+    // тому клієнту не приходило "Ваш запис підтверджено").
+    await this.notificationsQueue.add('appointment_status_changed', {
+      appointmentId: apt.id,
+      oldStatus: AppointmentStatus.PENDING,
+      newStatus: AppointmentStatus.CONFIRMED,
+    }).catch(e => this.logger.warn(`Не вдалось поставити нотифікацію підтвердження: ${e.message}`));
+
     const time = new Date(apt.slot.startAt).toLocaleString('uk-UA', {
       timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
     });

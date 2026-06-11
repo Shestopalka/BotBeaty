@@ -118,6 +118,7 @@ export default function SettingsPage() {
   // ── Booking ──
   const [autoConfirm,       setAutoConfirm]       = useState(master?.autoConfirm ?? false);
   const [cancellationHours, setCancellationHours] = useState(master?.cancellationHours ?? 0);
+  const [maxPerDay,         setMaxPerDay]         = useState(master?.maxBookingsPerDayPerClient ?? 1);
 
   // ── Slot defaults ──
   const [workStart,    setWorkStart]    = useState(master?.defaultWorkStart ?? '09:00');
@@ -146,6 +147,7 @@ export default function SettingsPage() {
         reminder2Hours:   rem2Hours,
         autoConfirm,
         cancellationHours,
+        maxBookingsPerDayPerClient: maxPerDay,
         defaultWorkStart:    workStart,
         defaultWorkEnd:      workEnd,
         defaultSlotDuration: slotDuration,
@@ -298,6 +300,35 @@ export default function SettingsPage() {
                   border: `1.5px solid ${cancellationHours === h ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-hint-color)33'}`,
                 }}>
                 {h === 0 ? '∞' : `${h}г`}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        <Row>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'var(--tg-theme-hint-color)22' }}>
+            <Calendar size={16} style={{ color: 'var(--tg-theme-hint-color)' }} />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>
+              Записів на день
+            </p>
+            <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              {`Один клієнт: до ${maxPerDay} на день`}
+            </p>
+          </div>
+          <div className="flex gap-1.5">
+            {[1, 2, 3, 5].map(n => (
+              <button key={n}
+                onClick={() => setMaxPerDay(n)}
+                className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: maxPerDay === n ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-bg-color)',
+                  color: maxPerDay === n ? 'var(--tg-theme-button-text-color)' : 'var(--tg-theme-hint-color)',
+                  border: `1.5px solid ${maxPerDay === n ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-hint-color)33'}`,
+                }}>
+                {n}
               </button>
             ))}
           </div>

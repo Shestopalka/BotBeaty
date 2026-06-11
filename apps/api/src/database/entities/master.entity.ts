@@ -112,6 +112,9 @@ export class Master extends BaseEntity {
   @Column({ type: 'int', default: 0 })
   cancellationHours: number; // За скільки годин до запису клієнт може скасувати (0 = завжди)
 
+  @Column({ type: 'int', default: 1 })
+  maxBookingsPerDayPerClient: number; // Скільки записів один клієнт може мати на один день
+
   // ─── Налаштування за замовчуванням для слотів ────────────────────────────
 
   @Column({ default: '09:00' })
