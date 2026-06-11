@@ -167,15 +167,29 @@ export class BotService implements OnModuleInit {
       // Перевіряємо токен перед запуском
       await bot.telegram.getMe();
 
-      // Оновлюємо menu button з актуальним URL при кожному старті
+      // Menu button з актуальним URL при кожному старті.
+      // ДЕФОЛТНА (для всіх, тобто КЛІЄНТІВ) → запис; кабінет клієнту не потрібен.
       const miniAppUrl = this.configService.get<string>('miniApp.url');
       await bot.telegram.setChatMenuButton({
         menuButton: {
           type: 'web_app',
-          text: '📅 Мій кабінет',
-          web_app: { url: `${miniAppUrl}/master/schedule` },
+          text: '📅 Записатись',
+          web_app: { url: `${miniAppUrl}/book/${master.id}` },
         },
-      }).catch(e => this.logger.warn(`Не вдалось оновити menu button: ${e.message}`));
+      }).catch(e => this.logger.warn(`Не вдалось оновити default menu button: ${e.message}`));
+
+      // ОСОБИСТИЙ чат майстра → «Мій кабінет» (перекриває дефолтну лише для нього).
+      const masterChatId = Number(master.telegramId);
+      if (Number.isSafeInteger(masterChatId)) {
+        await bot.telegram.setChatMenuButton({
+          chatId: masterChatId,
+          menuButton: {
+            type: 'web_app',
+            text: '📅 Мій кабінет',
+            web_app: { url: `${miniAppUrl}/master/schedule` },
+          },
+        }).catch(e => this.logger.warn(`Не вдалось оновити menu button майстра: ${e.message}`));
+      }
 
       this.setupMasterBotHandlers(bot, master);
       this.masterBots.set(master.id, bot);

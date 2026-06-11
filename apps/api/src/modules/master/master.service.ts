@@ -60,7 +60,10 @@ export class MasterService {
         bio: dto.bio,
         botToken: dto.botToken,
         botUsername,
-        status: MasterStatus.INACTIVE, // registerMasterBot змінить на ACTIVE
+        // ACTIVE одразу: токен уже провалідовано (dryRun вище), бота запускаємо нижче.
+        // Інакше майстер лишався б INACTIVE і після рестарту loadMasterBots його не
+        // підхопив би → не працювали б нотифікації й команди бота.
+        status: MasterStatus.ACTIVE,
       });
       return manager.getRepository(Master).save(master);
     });
