@@ -16,7 +16,12 @@ export enum AppointmentStatus {
 }
 
 @Entity('appointments')
-@Index(['slotId'], { unique: true }) // Один слот = один запис
+// Один слот = один АКТИВНИЙ запис. Скасовані (cancelled/no_show) не тримають слот,
+// тож partial-unique дозволяє перебронювати звільнений слот, але блокує два активні.
+@Index(['slotId'], {
+  unique: true,
+  where: `"deletedAt" IS NULL AND status NOT IN ('cancelled_client','cancelled_master','no_show')`,
+})
 export class Appointment extends BaseEntity {
   @Column({
     type: 'enum',
@@ -46,10 +51,12 @@ export class Appointment extends BaseEntity {
   @JoinColumn({ name: 'serviceId' })
   service: Service;
 
-  @Column({ type: 'uuid', unique: true })
+  @Column({ type: 'uuid' })
   slotId: string;
 
-  @OneToOne(() => Slot)
+  // ManyToOne (а не OneToOne): за один слот в історії може бути кілька записів
+  // (скасовані + один активний). Активність гарантує partial-unique індекс вище.
+  @ManyToOne(() => Slot)
   @JoinColumn({ name: 'slotId' })
   slot: Slot;
 

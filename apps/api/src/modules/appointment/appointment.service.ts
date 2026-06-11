@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In, IsNull } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -27,6 +27,9 @@ export interface CreateAppointmentDto {
 
 @Injectable()
 export class AppointmentService {
+  // Макс. активних (pending/confirmed) записів на одного клієнта в одного майстра.
+  private static readonly MAX_ACTIVE_PER_CLIENT = 3;
+
   constructor(
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
@@ -95,6 +98,21 @@ export class AppointmentService {
       // Блокований клієнт не може записатись
       if (client.tag === ClientTag.BLOCKED || client.tag === ClientTag.UNWANTED) {
         throw new BadRequestException('Запис недоступний');
+      }
+
+      // Ліміт активних записів на клієнта — щоб один клієнт не забронював усі слоти.
+      const activeCount = await manager.getRepository(Appointment).count({
+        where: {
+          clientId: client.id,
+          masterId: dto.masterId,
+          status: In([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
+          deletedAt: IsNull(),
+        },
+      });
+      if (activeCount >= AppointmentService.MAX_ACTIVE_PER_CLIENT) {
+        throw new BadRequestException(
+          `Можна мати щонайбільше ${AppointmentService.MAX_ACTIVE_PER_CLIENT} активних записів. Дочекайтесь візиту або скасуйте зайвий.`,
+        );
       }
 
       // 4. Бронюємо слот (з оптимістичним локом)
