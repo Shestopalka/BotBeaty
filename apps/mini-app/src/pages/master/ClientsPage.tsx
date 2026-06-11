@@ -129,7 +129,7 @@ export default function ClientsPage() {
                     background: 'var(--theme-pill-bg)',
                     color: 'var(--tg-theme-button-color)',
                   }}>
-                  {client.fullName[0].toUpperCase()}
+                  {(client.fullName?.[0] ?? '?').toUpperCase()}
                 </div>
 
                 <div className="flex-1 min-w-0">
