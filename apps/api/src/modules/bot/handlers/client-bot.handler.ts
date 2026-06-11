@@ -33,6 +33,21 @@ export class ClientBotHandler {
    */
   async handleStart(ctx: any, master: Master) {
     const miniAppUrl = this.configService.get<string>('miniApp.url');
+
+    // Примусово виставляємо menu-кнопку САМЕ для цього чату клієнта → "Записатись".
+    // Клієнту кабінет майстра не потрібен; per-chat кнопка перекриває кеш дефолту.
+    const chatId = ctx.chat?.id;
+    if (chatId) {
+      await ctx.telegram.setChatMenuButton({
+        chatId,
+        menuButton: {
+          type: 'web_app',
+          text: '📅 Записатись',
+          web_app: { url: `${miniAppUrl}/book/${master.id}` },
+        },
+      }).catch(() => {});
+    }
+
     const specialties = (master.specialties ?? [])
       .map(s => SPECIALTY_LABELS[s] ?? s)
       .join(' · ');
