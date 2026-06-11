@@ -1,0 +1,25 @@
+# Залежності/білди — встановлюються/збираються всередині образу
+node_modules
+**/node_modules
+dist
+**/dist
+apps/mini-app/dist
+
+# Yarn PnP — щоб не конфліктувало з npm всередині образу
+.yarn
+.pnp.cjs
+.pnp.loader.mjs
+.yarnrc.yml
+
+# VCS / локальне
+.git
+.gitignore
+*.log
+.DS_Store
+.env
+**/.env
+.env.*
+!.env.production.example
+
+# Туторіали/тимчасове
+tunnel.sh

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>BeatyBOT</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Фон встановлюється до завантаження React — не показуємо чорний екран -->
+    <style>html,body{margin:0;background-color:#fff8f9;}</style>
+    <script>
+      function showErr(title, msg) {
+        document.getElementById('root').innerHTML =
+          '<div style="padding:16px;color:#c00;font-family:monospace;font-size:12px;background:#fff8f9;">' +
+          '<b>' + title + '</b><br><pre style="white-space:pre-wrap;word-break:break-all;font-size:10px;">' + msg + '</pre></div>';
+      }
+      // Ловимо runtime JS помилки
+      window.onerror = function(msg, src, line, col, err) {
+        showErr('JS Error', msg + '\n' + (src||'') + ':' + line + '\n' + (err && err.stack ? err.stack.slice(0,400) : ''));
+        return false;
+      };
+      // Ловимо Promise rejection (модулі що не завантажились)
+      window.addEventListener('unhandledrejection', function(e) {
+        showErr('Promise Error', String(e.reason && e.reason.stack ? e.reason.stack.slice(0,400) : e.reason));
+      });
+      // Ловимо помилки завантаження ресурсів (<script>, <link>)
+      window.addEventListener('error', function(e) {
+        if (e.target && e.target !== window) {
+          showErr('Resource Error', 'Failed to load: ' + (e.target.src || e.target.href || 'unknown'));
+        }
+      }, true);
+    </script>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Показується ДО завантаження React — якщо цей текст видно, значить React не змонтувався -->
+      <div style="padding:24px;color:#999;font-family:sans-serif;font-size:14px;">Завантаження…</div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

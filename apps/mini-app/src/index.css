@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Fallback — Dusty Rose за замовчуванням */
+  --tg-theme-bg-color: #fff8f9;
+  --tg-theme-text-color: #4b1528;
+  --tg-theme-hint-color: #b07888;
+  --tg-theme-link-color: #993556;
+  --tg-theme-button-color: #d4537e;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #fbeaf0;
+  --theme-glow-color: rgba(212,83,126,0.18);
+  --theme-shadow: 0 8px 32px rgba(212,83,126,0.18), 0 2px 8px rgba(212,83,126,0.08);
+  --theme-btn-shadow: 0 4px 16px rgba(212,83,126,0.45);
+  --theme-pill-bg: rgba(212,83,126,0.1);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  overscroll-behavior: none;
+  /* Враховуємо safe area Telegram (шапка + iOS notch) */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+#root {
+  /* Telegram content safe area — відступ під header бара */
+  padding-top: var(--tg-content-safe-area-inset-top, 0px);
+}
+
+/* Скролл без scrollbar на мобільному */
+::-webkit-scrollbar { display: none; }
+
+/* Інпут для онбордингу */
+.onb-input {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  background: var(--tg-theme-secondary-bg-color);
+  color: var(--tg-theme-text-color);
+  transition: box-shadow 0.2s;
+}
+.onb-input:focus {
+  box-shadow: 0 0 0 1.5px var(--tg-theme-button-color);
+}
+.onb-input::placeholder {
+  color: var(--tg-theme-hint-color);
+  opacity: 0.6;
+}
+
+/* ─── Анімації шітів і модалок ──────────────────────────────────────────────── */
+
+@keyframes bb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* iOS-style spring slide-up — cubic-bezier від Apple */
+@keyframes bb-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+
+/* Для контенту всередині шіту — легкий scale + fade */
+@keyframes bb-sheet-in {
+  from { transform: translateY(100%) scale(0.98); opacity: 0.6; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1;   }
+}
+
+/* Для переходу між вкладками */
+@keyframes bb-page-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.bb-backdrop {
+  animation: bb-fade-in 0.22s ease forwards;
+}
+
+.bb-sheet {
+  animation: bb-sheet-in 0.36s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.bb-page {
+  animation: bb-page-in 0.2s ease forwards;
+}
+
+@keyframes bb-sheet-out {
+  from { transform: translateY(0);    opacity: 1;   }
+  to   { transform: translateY(100%); opacity: 0.6; }
+}
+
+@keyframes bb-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.bb-sheet-out {
+  animation: bb-sheet-out 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.bb-backdrop-out {
+  animation: bb-fade-out 0.28s ease forwards;
+}
