@@ -4,7 +4,7 @@ import { Illustration } from './Illustration';
 // Вартість підписки. Зміни тут, якщо тариф інший.
 export const PLAN_PRICE_UAH = 250;
 // Контакт для оплати (поки немає платіжки) — впиши свій Telegram, напр. 'https://t.me/your_username'.
-const PAY_CONTACT_URL = '';
+const PAY_CONTACT_URL: string = '';
 
 export function Paywall({
   status,
