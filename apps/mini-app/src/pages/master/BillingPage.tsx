@@ -16,13 +16,15 @@ const FEATURES = [
 
 interface Plan {
   id: string; name: string; months: number; perMonth: number; total: number;
-  badge?: string; highlight?: boolean;
+  badge?: string; highlight?: boolean; extras?: string[];
 }
 
 const PLANS: Plan[] = [
   { id: 'starter', name: 'Стартер', months: 1,  perMonth: 250, total: 250 },
-  { id: 'pro',     name: 'Про',     months: 3,  perMonth: 225, total: 675, badge: '−10%' },
-  { id: 'year',    name: 'Рік',     months: 12, perMonth: 200, total: 2400, badge: 'Найвигідніше · −20%', highlight: true },
+  { id: 'pro',     name: 'Про',     months: 3,  perMonth: 225, total: 675, badge: '−10%',
+    extras: ['Пріоритетна підтримка'] },
+  { id: 'year',    name: 'Рік',     months: 12, perMonth: 200, total: 2400, badge: 'Найвигідніше · −20%', highlight: true,
+    extras: ['Найвищий пріоритет у підтримці'] },
 ];
 
 type Mode = 'welcome' | 'locked' | 'manage';
@@ -116,6 +118,12 @@ export function BillingPage({ mode = 'manage', onRefresh }: { mode?: Mode; onRef
                   <div key={f} className="flex items-center gap-2">
                     <Check size={14} style={{ color: 'var(--tg-theme-button-color)' }} strokeWidth={2.5} />
                     <span className="text-xs" style={{ color: 'var(--tg-theme-text-color)' }}>{f}</span>
+                  </div>
+                ))}
+                {(p.extras ?? []).map((f) => (
+                  <div key={f} className="flex items-center gap-2">
+                    <Check size={14} style={{ color: 'var(--tg-theme-button-color)' }} strokeWidth={2.5} />
+                    <span className="text-xs font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>{f}</span>
                   </div>
                 ))}
               </div>
