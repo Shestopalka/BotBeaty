@@ -3,6 +3,7 @@ import { ChevronLeft, Check } from 'lucide-react';
 import { THEMES, ThemeName, applyTheme } from '../../themes';
 import api from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
+import { Illustration } from '../../components/Illustration';
 
 type Step = 'welcome' | 'specialty' | 'profile' | 'theme' | 'bot' | 'done';
 
@@ -45,7 +46,7 @@ export default function OnboardingPage() {
   const [masterBotUsername, setMasterBotUsername] = useState('');
 
   const stepIndex = STEPS.indexOf(step);
-  const progressIndex = PROGRESS_STEPS.indexOf(step);
+  const progressIndex = (PROGRESS_STEPS as Step[]).indexOf(step);
 
   function next() { if (stepIndex < STEPS.length - 1) setStep(STEPS[stepIndex + 1]); }
   function back() { if (stepIndex > 0) setStep(STEPS[stepIndex - 1]); }
@@ -139,7 +140,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         {[
           { n: '01', title: 'Власний бот', desc: 'Клієнти записуються прямо в Telegram' },
           { n: '02', title: 'Розклад',     desc: 'Управляй слотами і записами в реальному часі' },
-          { n: '03', title: 'Оплата',      desc: 'Приймай передоплату онлайн' },
+          { n: '03', title: 'Нагадування', desc: 'Автоматичні нагадування клієнтам про візит' },
           { n: '04', title: 'Аналітика',   desc: 'Статистика клієнтів і доходів' },
         ].map(({ n, title, desc }) => (
           <div key={n} className="flex items-start gap-4">
@@ -349,9 +350,9 @@ function BotStep({ token, onChange, onSubmit, loading, error }: {
 function DoneStep({ username }: { username: string }) {
   return (
     <div className="flex flex-col flex-1 px-5 pt-16 pb-8">
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-8"
-        style={{ background: 'var(--theme-pill-bg)' }}>
-        <Check size={28} style={{ color: 'var(--tg-theme-button-color)' }} strokeWidth={2.5} />
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-8"
+        style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+        <Illustration name="sparkle" size={36} />
       </div>
 
       <h1 className="text-4xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
@@ -387,7 +388,7 @@ function DoneStep({ username }: { username: string }) {
         ))}
       </div>
 
-      <Btn onClick={() => window.location.href = '/master/schedule'} className="mt-8">
+      <Btn onClick={() => window.location.href = '/master/home'} className="mt-8">
         Відкрити кабінет
       </Btn>
     </div>
