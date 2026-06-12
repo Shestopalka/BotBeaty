@@ -34,6 +34,7 @@ export function BillingPage({ mode = 'manage', onRefresh }: { mode?: Mode; onRef
   const { master } = useMaster();
   const [checking, setChecking] = useState(false);
 
+  const onTrial = master?.subscriptionStatus === 'trialing';
   const trialDays = master?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(master.trialEndsAt).getTime() - Date.now()) / 86400000))
     : 14;
@@ -68,8 +69,8 @@ export function BillingPage({ mode = 'manage', onRefresh }: { mode?: Mode; onRef
             : 'Усі функції включені в кожен план. Що довший період — то дешевший місяць.'}
         </p>
 
-        {/* Тріал — підсвічений після реєстрації */}
-        {mode === 'welcome' && (
+        {/* Тріал — підсвічений після реєстрації або поки триває пробний період */}
+        {(mode === 'welcome' || onTrial) && (
           <div className="rounded-2xl p-4 mb-6 border-2"
             style={{ background: 'var(--tg-theme-secondary-bg-color)', borderColor: 'var(--tg-theme-button-color)', boxShadow: 'var(--theme-shadow)' }}>
             <div className="flex items-center justify-between">
@@ -134,6 +135,11 @@ export function BillingPage({ mode = 'manage', onRefresh }: { mode?: Mode; onRef
                   : { background: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-button-color)', border: '1.5px solid var(--tg-theme-button-color)' }}>
                 Обрати
               </button>
+              {mode !== 'locked' && (
+                <p className="text-[11px] text-center mt-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  14 днів безкоштовно
+                </p>
+              )}
             </div>
           ))}
         </div>
