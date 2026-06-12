@@ -32,6 +32,12 @@ const TAG_LABELS: Record<string, string> = {
   blocked: 'Заблоковані', unwanted: 'Небажані',
 };
 
+function fmtDay(s?: string): string {
+  if (!s) return '';
+  const [, m, d] = s.slice(0, 10).split('-');
+  return d && m ? `${d}.${m}` : s;
+}
+
 function GrowthBadge({ value }: { value: number }) {
   const positive = value >= 0;
   return (
@@ -89,8 +95,8 @@ function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
         })}
       </svg>
       <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
-        <span>{data[0]?.date?.slice(5)}</span>
-        <span>{data[data.length - 1]?.date?.slice(5)}</span>
+        <span>{fmtDay(data[0]?.date)}</span>
+        <span>{fmtDay(data[data.length - 1]?.date)}</span>
       </div>
     </div>
   );
