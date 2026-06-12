@@ -6,17 +6,27 @@ import { mastersApi, slotsApi, appointmentsApi } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
 import { applyTheme, THEMES, ThemeName } from '../../themes';
 import { Illustration } from '../../components/Illustration';
+import { MapPin, Scissors, Clock, Check } from 'lucide-react';
 
-type Step = 'service' | 'slot' | 'confirm' | 'success' | 'cancelled';
+type Step = 'intro' | 'service' | 'slot' | 'confirm' | 'success' | 'cancelled';
 
 interface Service { id: string; name: string; durationMinutes: number; price: number; currency: string; }
 interface Slot { id: string; startAt: string; endAt: string; }
-interface Master { id: string; fullName: string; specialties: string[]; services: Service[]; theme?: string; }
+interface Master {
+  id: string; fullName: string; specialties: string[]; services: Service[];
+  theme?: string; city?: string; bio?: string; avatarUrl?: string;
+}
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  manicure: 'Манікюр', pedicure: 'Педикюр', eyelashes: 'Вії', makeup: 'Макіяж',
+  hairdresser: 'Перукар', tattoo: 'Тату', eyebrows: 'Брови', massage: 'Масаж',
+  cosmetology: 'Косметологія', other: 'Інше',
+};
 
 export default function BookingPage() {
   const { masterId } = useParams<{ masterId: string }>();
   const { user } = useTelegram();
-  const [step, setStep] = useState<Step>('service');
+  const [step, setStep] = useState<Step>('intro');
   const [master, setMaster] = useState<Master | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -140,13 +150,82 @@ export default function BookingPage() {
     );
   }
 
+  // ─── Вітальний екран клієнта (профіль майстра + як це працює) ──────────────
+  if (step === 'intro') {
+    const specs = (master.specialties ?? []).map(s => SPECIALTY_LABELS[s] ?? s);
+    return (
+      <div className="flex flex-col min-h-screen px-5 pt-12 pb-8 bb-page"
+        style={{ background: 'var(--tg-theme-bg-color)' }}>
+        {/* Профіль майстра */}
+        <div className="flex flex-col items-center text-center mb-8">
+          {master.avatarUrl ? (
+            <img src={master.avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover mb-4" />
+          ) : (
+            <div className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold mb-4"
+              style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+              {(master.fullName?.[0] ?? '✦').toUpperCase()}
+            </div>
+          )}
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
+            {master.fullName}
+          </h1>
+          {specs.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5 mt-2.5">
+              {specs.map(s => (
+                <span key={s} className="text-xs px-2.5 py-1 rounded-full"
+                  style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-link-color)' }}>{s}</span>
+              ))}
+            </div>
+          )}
+          {master.city && (
+            <p className="text-sm mt-2.5 flex items-center gap-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              <MapPin size={13} /> {master.city}
+            </p>
+          )}
+          {master.bio && (
+            <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              {master.bio}
+            </p>
+          )}
+        </div>
+
+        {/* Як це працює */}
+        <div className="rounded-2xl p-4 space-y-3.5" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>Як це працює</p>
+          {[
+            { Icon: Scissors, t: 'Оберіть послугу' },
+            { Icon: Clock, t: 'Виберіть зручний час' },
+            { Icon: Check, t: 'Підтвердьте запис' },
+          ].map(({ Icon, t }, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'var(--theme-pill-bg)' }}>
+                <Icon size={16} style={{ color: 'var(--tg-theme-button-color)' }} />
+              </div>
+              <span className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>{t}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={() => { tg?.HapticFeedback?.impactOccurred?.('light'); setStep('service'); }}
+          className="w-full mt-8 py-4 rounded-2xl font-semibold text-base"
+          style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
+          Записатись онлайн
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen pb-4">
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
         <h1 className="text-xl font-bold">{master.fullName}</h1>
         <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
-          {master.specialties?.join(', ')}
+          {(master.specialties ?? []).map(s => SPECIALTY_LABELS[s] ?? s).join(', ')}
         </p>
       </div>
 
