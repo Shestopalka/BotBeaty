@@ -196,7 +196,7 @@ export default function SettingsPage() {
     <div className="flex flex-col px-4 pt-6 pb-12">
       {/* Sticky save-бар — зʼявляється лише за наявності незбережених змін */}
       {dirty && (
-        <div style={{
+        <div className="bb-slide-down" style={{
           position: 'sticky', top: 0, zIndex: 30,
           margin: '-24px -16px 14px', padding: '10px 16px',
           display: 'flex', alignItems: 'center', gap: 10,

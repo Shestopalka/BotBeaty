@@ -2,6 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { TrendingUp, TrendingDown, Users, Award } from 'lucide-react';
 import { analyticsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { Illustration } from '../../components/Illustration';
+
+function EmptyHint({ icon, text }: { icon: 'services' | 'clients' | 'calendar'; text: string }) {
+  return (
+    <div className="flex flex-col items-center py-6 gap-2">
+      <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.75 }}>
+        <Illustration name={icon} size={60} />
+      </span>
+      <p className="text-sm text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>{text}</p>
+    </div>
+  );
+}
 
 interface DashboardStats {
   revenueThisMonth: number;
@@ -51,11 +63,7 @@ function StatCard({ label, value, sub, growth }: {
 
 // Мінімалістичний бар-чарт (SVG, без бібліотек)
 function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
-  if (!data.length) return (
-    <p className="text-center py-6 text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
-      Немає даних за цей період
-    </p>
-  );
+  if (!data.length) return <EmptyHint icon="calendar" text="Немає даних за цей період" />;
 
   const max = Math.max(...data.map(d => d.revenue), 1);
   const BAR_W = 8;
@@ -152,7 +160,7 @@ export default function AnalyticsPage() {
           <Award size={15} style={{ color: 'var(--tg-theme-button-color)' }} /> Топ-послуги
         </p>
         {s.topServices.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Немає завершених записів</p>
+          <EmptyHint icon="services" text="Немає завершених записів" />
         ) : (
           <div className="space-y-3">
             {s.topServices.map((svc, i) => {
@@ -192,7 +200,7 @@ export default function AnalyticsPage() {
           <Users size={15} style={{ color: 'var(--tg-theme-button-color)' }} /> Клієнти по категоріях
         </p>
         {s.clientsByTag.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Клієнтів ще немає</p>
+          <EmptyHint icon="clients" text="Клієнтів ще немає" />
         ) : (
           <div className="space-y-2">
             {s.clientsByTag.map((ct) => (
