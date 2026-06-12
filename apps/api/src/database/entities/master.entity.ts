@@ -138,7 +138,11 @@ export class Master extends BaseEntity {
   currentPeriodEnd: Date | null; // до якої дати оплачено
 
   @Column({ default: 'standard' })
-  plan: string;
+  plan: string; // 'starter' | 'pro' | 'year' (історичні — 'standard')
+
+  // Брендинг (Pro/Year): власний акцентний колір сторінки запису клієнта.
+  @Column({ type: 'varchar', length: 9, nullable: true })
+  accentColor: string | null;
 
   // ─── Налаштування за замовчуванням для слотів ────────────────────────────
 

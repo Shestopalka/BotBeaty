@@ -43,11 +43,11 @@ export class MasterController {
   activateSubscription(
     @Param('id') id: string,
     @Headers('x-admin-secret') secret: string,
-    @Body() body: { months?: number },
+    @Body() body: { months?: number; plan?: string },
   ) {
     if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
       throw new UnauthorizedException('Невалідний адмін-секрет');
     }
-    return this.masterService.activateSubscription(id, body?.months ?? 1);
+    return this.masterService.activateSubscription(id, { months: body?.months, plan: body?.plan });
   }
 }

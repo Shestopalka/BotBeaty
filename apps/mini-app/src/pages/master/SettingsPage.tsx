@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { Check, Bell, BellOff, Calendar, Clock, Zap, Ban } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, Bell, BellOff, Calendar, Clock, Zap, Ban, Lock } from 'lucide-react';
 import { THEMES, ThemeName, applyTheme, getSavedTheme } from '../../themes';
 import { mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { isProPlus } from '../../lib/entitlements';
+
+const ACCENT_SWATCHES = ['#d4537e', '#e8748a', '#c84070', '#a8546f', '#7a5af8', '#1d9e75', '#d85a30'];
 
 // ─── Reusable components ─────────────────────────────────────────────────────
 
@@ -120,6 +124,10 @@ export default function SettingsPage() {
   const [cancellationHours, setCancellationHours] = useState(master?.cancellationHours ?? 0);
   const [maxPerDay,         setMaxPerDay]         = useState(master?.maxBookingsPerDayPerClient ?? 1);
 
+  // ── Брендинг (Pro/Year) ──
+  const [accentColor, setAccentColor] = useState(master?.accentColor ?? '');
+  const canBrand = isProPlus(master);
+
   // ── Slot defaults ──
   const [workStart,    setWorkStart]    = useState(master?.defaultWorkStart ?? '09:00');
   const [workEnd,      setWorkEnd]      = useState(master?.defaultWorkEnd ?? '18:00');
@@ -149,6 +157,7 @@ export default function SettingsPage() {
         autoConfirm,
         cancellationHours,
         maxBookingsPerDayPerClient: maxPerDay,
+        accentColor: accentColor || null,
         defaultWorkStart:    workStart,
         defaultWorkEnd:      workEnd,
         defaultSlotDuration: slotDuration,
@@ -175,6 +184,7 @@ export default function SettingsPage() {
     autoConfirm !== master.autoConfirm ||
     cancellationHours !== master.cancellationHours ||
     maxPerDay !== master.maxBookingsPerDayPerClient ||
+    (accentColor || '') !== (master.accentColor || '') ||
     workStart !== master.defaultWorkStart ||
     workEnd !== master.defaultWorkEnd ||
     slotDuration !== master.defaultSlotDuration ||
@@ -196,6 +206,7 @@ export default function SettingsPage() {
     setRem2Enabled(master.reminder2Enabled); setRem2Hours(master.reminder2Hours);
     setAutoConfirm(master.autoConfirm); setCancellationHours(master.cancellationHours);
     setMaxPerDay(master.maxBookingsPerDayPerClient);
+    setAccentColor(master.accentColor ?? '');
     setWorkStart(master.defaultWorkStart); setWorkEnd(master.defaultWorkEnd);
     setSlotDuration(master.defaultSlotDuration); setBreakMinutes(master.defaultBreakMinutes);
   }
@@ -266,6 +277,40 @@ export default function SettingsPage() {
             </Row>
           );
         })}
+      </Card>
+
+      {/* ── БРЕНДИНГ (Pro/Year) ── */}
+      <SectionTitle>Брендинг</SectionTitle>
+      <Card>
+        <div className="px-1 py-1">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>Колір бренду</p>
+              <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>Акцент на сторінці запису клієнта</p>
+            </div>
+            {!canBrand && (
+              <Link to="/master/billing" className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+                <Lock size={11} /> Pro
+              </Link>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2.5" style={{ opacity: canBrand ? 1 : 0.45, pointerEvents: canBrand ? 'auto' : 'none' }}>
+            <button onClick={() => setAccentColor('')}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ border: `1.5px solid ${!accentColor ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-hint-color)55'}`, background: 'var(--tg-theme-bg-color)' }}
+              title="За темою">
+              {!accentColor && <Check size={12} style={{ color: 'var(--tg-theme-button-color)' }} strokeWidth={3} />}
+            </button>
+            {ACCENT_SWATCHES.map(c => (
+              <button key={c} onClick={() => setAccentColor(c)}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: c, boxShadow: accentColor === c ? `0 0 0 2px var(--tg-theme-bg-color), 0 0 0 4px ${c}` : 'none' }}>
+                {accentColor === c && <Check size={12} color="#fff" strokeWidth={3} />}
+              </button>
+            ))}
+          </div>
+        </div>
       </Card>
 
       {/* ── НАГАДУВАННЯ ── */}

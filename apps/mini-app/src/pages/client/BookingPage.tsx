@@ -14,7 +14,7 @@ interface Service { id: string; name: string; durationMinutes: number; price: nu
 interface Slot { id: string; startAt: string; endAt: string; }
 interface Master {
   id: string; fullName: string; specialties: string[]; services: Service[];
-  theme?: string; city?: string; bio?: string; avatarUrl?: string;
+  theme?: string; city?: string; bio?: string; avatarUrl?: string; accentColor?: string | null;
 }
 
 const SPECIALTY_LABELS: Record<string, string> = {
@@ -55,6 +55,11 @@ export default function BookingPage() {
         // Застосовуємо тему майстра для клієнта
         if (data?.theme && data.theme in THEMES) {
           applyTheme(data.theme as ThemeName);
+        }
+        // Брендинг (Pro/Year): власний акцентний колір перекриває колір теми
+        if (data?.accentColor) {
+          document.documentElement.style.setProperty('--tg-theme-button-color', data.accentColor);
+          document.documentElement.style.setProperty('--tg-theme-link-color', data.accentColor);
         }
       })
       .catch((err) => {

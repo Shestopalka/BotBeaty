@@ -121,7 +121,12 @@ export class MasterService {
    * Активувати/продовжити підписку на N місяців (ручна активація після оплати).
    * Якщо період ще не сплив — додаємо зверху, інакше від сьогодні.
    */
-  async activateSubscription(masterId: string, months = 1): Promise<Partial<Master>> {
+  async activateSubscription(
+    masterId: string,
+    opts: { plan?: string; months?: number } = {},
+  ): Promise<Partial<Master>> {
+    const planMonths: Record<string, number> = { starter: 1, pro: 3, year: 12 };
+    const months = opts.months ?? (opts.plan ? planMonths[opts.plan] ?? 1 : 1);
     const master = await this.findEntityById(masterId);
     const now = new Date();
     const base =
@@ -130,17 +135,19 @@ export class MasterService {
         : now;
     const end = new Date(base);
     end.setMonth(end.getMonth() + months);
-    await this.masterRepo.update(masterId, {
+    const patch: Partial<Master> = {
       subscriptionStatus: SubscriptionStatus.ACTIVE,
       currentPeriodEnd: end,
-    });
+    };
+    if (opts.plan) patch.plan = opts.plan;
+    await this.masterRepo.update(masterId, patch);
     return this.sanitize(await this.findEntityById(masterId));
   }
 
   private static readonly ALLOWED_UPDATE_FIELDS = [
     'fullName', 'phone', 'avatarUrl', 'bio', 'city', 'specialties', 'theme',
     'reminder1Enabled', 'reminder1Hours', 'reminder2Enabled', 'reminder2Hours',
-    'autoConfirm', 'cancellationHours', 'maxBookingsPerDayPerClient',
+    'autoConfirm', 'cancellationHours', 'maxBookingsPerDayPerClient', 'accentColor',
     'defaultWorkStart', 'defaultWorkEnd', 'defaultSlotDuration', 'defaultBreakMinutes',
   ] as const;
 
