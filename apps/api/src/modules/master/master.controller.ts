@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Headers, UnauthorizedException } from '@nestjs/common';
 import { MasterService, RegisterMasterDto } from './master.service';
 import { TgUser } from '../../common/decorators/tg-user.decorator';
 import { TelegramUser } from '../auth/telegram-auth.service';
@@ -34,5 +34,20 @@ export class MasterController {
   @Patch(':id')
   update(@CurrentMasterId() masterId: string, @Body() body: any) {
     return this.masterService.updateOwnProfile(masterId, body);
+  }
+
+  // Ручна активація/продовження підписки. Захищено адмін-секретом
+  // (поки немає вебхука платіжки — засновник активує після підтвердження оплати).
+  @Public()
+  @Post(':id/subscription/activate')
+  activateSubscription(
+    @Param('id') id: string,
+    @Headers('x-admin-secret') secret: string,
+    @Body() body: { months?: number },
+  ) {
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+      throw new UnauthorizedException('Невалідний адмін-секрет');
+    }
+    return this.masterService.activateSubscription(id, body?.months ?? 1);
   }
 }

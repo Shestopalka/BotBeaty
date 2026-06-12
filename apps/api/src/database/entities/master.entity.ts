@@ -38,6 +38,13 @@ export enum MasterStatus {
   SUSPENDED = 'suspended',
 }
 
+export enum SubscriptionStatus {
+  TRIALING = 'trialing',   // безкоштовний пробний період
+  ACTIVE = 'active',       // оплачено, період діє
+  PAST_DUE = 'past_due',   // строк сплив, у грейс-періоді
+  CANCELED = 'canceled',   // доступ закрито
+}
+
 @Entity('masters')
 @Index(['telegramId'], { unique: true })
 export class Master extends BaseEntity {
@@ -114,6 +121,24 @@ export class Master extends BaseEntity {
 
   @Column({ type: 'int', default: 1 })
   maxBookingsPerDayPerClient: number; // Скільки записів один клієнт може мати на один день
+
+  // ─── Підписка на платформу ───────────────────────────────────────────────
+
+  @Column({
+    type: 'enum',
+    enum: SubscriptionStatus,
+    default: SubscriptionStatus.TRIALING,
+  })
+  subscriptionStatus: SubscriptionStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  trialEndsAt: Date | null; // кінець пробного періоду
+
+  @Column({ type: 'timestamptz', nullable: true })
+  currentPeriodEnd: Date | null; // до якої дати оплачено
+
+  @Column({ default: 'standard' })
+  plan: string;
 
   // ─── Налаштування за замовчуванням для слотів ────────────────────────────
 

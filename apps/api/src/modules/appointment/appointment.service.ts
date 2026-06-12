@@ -9,7 +9,7 @@ import { Repository, DataSource } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
-import { Master } from '../../database/entities/master.entity';
+import { Master, SubscriptionStatus } from '../../database/entities/master.entity';
 import { Slot } from '../../database/entities/slot.entity';
 import { Client, ClientTag } from '../../database/entities/client.entity';
 import { Service } from '../../database/entities/service.entity';
@@ -102,8 +102,19 @@ export class AppointmentService {
       // КИЇВСЬКИЙ день, що й обраний слот.
       const masterLimitRow = await manager.getRepository(Master).findOne({
         where: { id: dto.masterId },
-        select: ['maxBookingsPerDayPerClient'],
+        select: ['maxBookingsPerDayPerClient', 'subscriptionStatus', 'trialEndsAt', 'currentPeriodEnd'],
       });
+
+      // Paywall: нові записи приймаються лише поки підписка майстра діє (тріал/active).
+      const accessUntil = masterLimitRow?.currentPeriodEnd ?? masterLimitRow?.trialEndsAt;
+      const subLive =
+        (masterLimitRow?.subscriptionStatus === SubscriptionStatus.TRIALING ||
+          masterLimitRow?.subscriptionStatus === SubscriptionStatus.ACTIVE) &&
+        !!accessUntil && new Date(accessUntil).getTime() >= Date.now();
+      if (!subLive) {
+        throw new BadRequestException('Майстер тимчасово не приймає онлайн-записи.');
+      }
+
       const perDayLimit = masterLimitRow?.maxBookingsPerDayPerClient ?? 1;
       const sameDayCount = await manager
         .getRepository(Appointment)

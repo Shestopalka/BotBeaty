@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { DataSource } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Master, MasterStatus, BeautySpecialty } from '../../database/entities/master.entity';
+import { Master, MasterStatus, BeautySpecialty, SubscriptionStatus } from '../../database/entities/master.entity';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { BotService } from '../bot/bot.service';
 
@@ -64,6 +64,9 @@ export class MasterService {
         // Інакше майстер лишався б INACTIVE і після рестарту loadMasterBots його не
         // підхопив би → не працювали б нотифікації й команди бота.
         status: MasterStatus.ACTIVE,
+        // Підписка: 14 днів безкоштовного тріалу з моменту реєстрації.
+        subscriptionStatus: SubscriptionStatus.TRIALING,
+        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
       return manager.getRepository(Master).save(master);
     });
@@ -111,6 +114,26 @@ export class MasterService {
     if (Object.keys(updates).length) {
       await this.masterRepo.update(masterId, updates);
     }
+    return this.sanitize(await this.findEntityById(masterId));
+  }
+
+  /**
+   * Активувати/продовжити підписку на N місяців (ручна активація після оплати).
+   * Якщо період ще не сплив — додаємо зверху, інакше від сьогодні.
+   */
+  async activateSubscription(masterId: string, months = 1): Promise<Partial<Master>> {
+    const master = await this.findEntityById(masterId);
+    const now = new Date();
+    const base =
+      master.currentPeriodEnd && new Date(master.currentPeriodEnd) > now
+        ? new Date(master.currentPeriodEnd)
+        : now;
+    const end = new Date(base);
+    end.setMonth(end.getMonth() + months);
+    await this.masterRepo.update(masterId, {
+      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      currentPeriodEnd: end,
+    });
     return this.sanitize(await this.findEntityById(masterId));
   }
 
