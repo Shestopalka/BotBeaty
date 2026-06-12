@@ -128,6 +128,7 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved,  setSaved]  = useState(false);
+  const [barClosing, setBarClosing] = useState(false);
 
   function handleThemeSelect(name: ThemeName) {
     setCurrentTheme(name);
@@ -180,6 +181,13 @@ export default function SettingsPage() {
     breakMinutes !== master.defaultBreakMinutes
   );
 
+  // Плавне зникнення бара при «Скасувати»: спершу анімація вгору, потім скидання.
+  function closeBar() {
+    if (barClosing) return;
+    setBarClosing(true);
+    setTimeout(() => { discard(); setBarClosing(false); }, 300);
+  }
+
   function discard() {
     if (!master) return;
     const t = (master.theme && master.theme in THEMES ? master.theme : currentTheme) as ThemeName;
@@ -195,8 +203,8 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col px-4 pt-6 pb-12">
       {/* Sticky save-бар — зʼявляється лише за наявності незбережених змін */}
-      {dirty && (
-        <div className="bb-slide-down" style={{
+      {(dirty || barClosing) && (
+        <div className={barClosing ? 'bb-slide-up-out' : 'bb-slide-down'} style={{
           position: 'sticky', top: 0, zIndex: 30,
           margin: '-24px -16px 14px', padding: '10px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
@@ -207,7 +215,7 @@ export default function SettingsPage() {
           <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--tg-theme-text-color)' }}>
             Незбережені зміни
           </span>
-          <button onClick={discard} disabled={saving}
+          <button onClick={closeBar} disabled={saving || barClosing}
             style={{ fontSize: 13, padding: '7px 12px', borderRadius: 10, color: 'var(--tg-theme-hint-color)', background: 'transparent' }}>
             Скасувати
           </button>
