@@ -77,6 +77,12 @@ export default function HomePage() {
   const next = upcoming[0];
   const firstName = (master?.fullName ?? '').split(' ')[0] || 'майстре';
 
+  // Банер підписки: тріал або період, що добігає кінця.
+  const subEnd = master?.subscriptionStatus === 'trialing' ? master?.trialEndsAt : master?.currentPeriodEnd;
+  const subDaysLeft = subEnd ? Math.ceil((new Date(subEnd).getTime() - Date.now()) / 86400000) : null;
+  const showTrial = master?.subscriptionStatus === 'trialing';
+  const showExpiring = master?.subscriptionStatus === 'active' && subDaysLeft !== null && subDaysLeft <= 5;
+
   return (
     <div className="px-4 pt-6 pb-4 flex flex-col gap-4">
       {/* Header */}
@@ -94,6 +100,16 @@ export default function HomePage() {
           </p>
         </div>
       </div>
+
+      {(showTrial || showExpiring) && (
+        <div className="rounded-2xl px-4 py-3" style={{ background: 'var(--theme-pill-bg)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
+            {showTrial
+              ? `Пробний період · залишилось ${Math.max(0, subDaysLeft ?? 0)} дн.`
+              : `Підписка діє ще ${Math.max(0, subDaysLeft ?? 0)} дн.`}
+          </p>
+        </div>
+      )}
 
       {/* Setup-чек-лист — поки кабінет не готовий */}
       {masterId && !setupDone && (

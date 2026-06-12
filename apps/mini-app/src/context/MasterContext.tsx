@@ -21,6 +21,12 @@ export interface Master {
   cancellationHours: number;
   maxBookingsPerDayPerClient: number;
 
+  // Subscription
+  subscriptionStatus?: 'trialing' | 'active' | 'past_due' | 'canceled';
+  trialEndsAt?: string | null;
+  currentPeriodEnd?: string | null;
+  plan?: string;
+
   // Slot defaults
   defaultWorkStart: string;
   defaultWorkEnd: string;

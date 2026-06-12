@@ -12,6 +12,7 @@ import SlotsPage from './pages/master/SlotsPage';
 import SettingsPage from './pages/master/SettingsPage';
 import OnboardingPage from './pages/onboarding/OnboardingPage';
 import BookingPage from './pages/client/BookingPage';
+import { Paywall } from './components/Paywall';
 import { applyTheme, getSavedTheme } from './themes';
 
 try {
@@ -21,7 +22,7 @@ try {
 }
 
 function MasterGuard({ children }: { children: React.ReactNode }) {
-  const { loading, isRegistered, networkError, refresh } = useMaster();
+  const { loading, isRegistered, networkError, refresh, master } = useMaster();
 
   if (loading) {
     return (
@@ -56,6 +57,12 @@ function MasterGuard({ children }: { children: React.ReactNode }) {
 
   if (!isRegistered) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Підписка лапснула — показуємо paywall замість кабінету.
+  const sub = master?.subscriptionStatus;
+  if (sub === 'past_due' || sub === 'canceled') {
+    return <Paywall status={sub} onRefresh={refresh} />;
   }
 
   return <>{children}</>;
