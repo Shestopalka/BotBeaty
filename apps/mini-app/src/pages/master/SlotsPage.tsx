@@ -5,6 +5,7 @@ import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide
 import { slotsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
+import { Illustration } from '../../components/Illustration';
 
 interface Slot {
   id: string;
@@ -144,7 +145,9 @@ export default function SlotsPage() {
           </div>
         ) : slots.length === 0 ? (
           <div className="flex flex-col items-center py-14 gap-3">
-            <p className="text-4xl">🗓️</p>
+            <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.85 }}>
+              <Illustration name="slots" size={88} />
+            </span>
             <p className="font-medium">Слотів немає</p>
             <p className="text-sm text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>
               Натисніть "Додати" щоб створити доступний час

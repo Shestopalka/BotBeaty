@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MasterProvider, useMaster } from './context/MasterContext';
 import { UIProvider } from './context/UIContext';
 import MasterLayout from './components/MasterLayout';
+import HomePage from './pages/master/HomePage';
 import SchedulePage from './pages/master/SchedulePage';
 import ClientsPage from './pages/master/ClientsPage';
 import ServicesPage from './pages/master/ServicesPage';
@@ -70,7 +71,8 @@ function MasterApp() {
               <MasterLayout />
             </MasterGuard>
           }>
-            <Route index element={<Navigate to="schedule" replace />} />
+            <Route index element={<Navigate to="home" replace />} />
+            <Route path="home"      element={<HomePage />} />
             <Route path="schedule"  element={<SchedulePage />} />
             <Route path="slots"     element={<SlotsPage />} />
             <Route path="clients"   element={<ClientsPage />} />
@@ -79,7 +81,7 @@ function MasterApp() {
             <Route path="settings"  element={<SettingsPage />} />
           </Route>
           <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="*" element={<Navigate to="/master/schedule" replace />} />
+          <Route path="*" element={<Navigate to="/master/home" replace />} />
         </Routes>
       </UIProvider>
     </MasterProvider>

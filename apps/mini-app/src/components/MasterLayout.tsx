@@ -1,8 +1,9 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Calendar, Users, Scissors, BarChart2, Clock, Settings } from 'lucide-react';
+import { Home, Calendar, Users, Scissors, BarChart2, Clock, Settings } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 
 const tabs = [
+  { to: '/master/home',      icon: Home,      label: 'Головна' },
   { to: '/master/schedule',  icon: Calendar,  label: 'Розклад' },
   { to: '/master/slots',     icon: Clock,     label: 'Слоти' },
   { to: '/master/clients',   icon: Users,     label: 'Клієнти' },

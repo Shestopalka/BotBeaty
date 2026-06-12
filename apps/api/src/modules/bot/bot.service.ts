@@ -186,7 +186,7 @@ export class BotService implements OnModuleInit {
           menuButton: {
             type: 'web_app',
             text: '📅 Мій кабінет',
-            web_app: { url: `${miniAppUrl}/master/schedule` },
+            web_app: { url: `${miniAppUrl}/master/home` },
           },
         }).catch(e => this.logger.warn(`Не вдалось оновити menu button майстра: ${e.message}`));
       }
