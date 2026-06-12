@@ -269,6 +269,22 @@ export class AppointmentService {
         throw new BadRequestException('Цей запис не можна скасувати');
       }
 
+      // Ліміт скасування майстра: не пізніше ніж за cancellationHours годин до запису.
+      const masterRow = await manager.getRepository(Master).findOne({
+        where: { id: appointment.masterId },
+        select: ['cancellationHours'],
+      });
+      const ch = masterRow?.cancellationHours ?? 0;
+      if (ch > 0 && appointment.slot?.startAt) {
+        const hoursLeft =
+          (new Date(appointment.slot.startAt).getTime() - Date.now()) / 3_600_000;
+        if (hoursLeft < ch) {
+          throw new BadRequestException(
+            `Скасувати можна не пізніше ніж за ${ch} год до запису. Звʼяжіться з майстром.`,
+          );
+        }
+      }
+
       const oldStatus = appointment.status;
       appointment.status = AppointmentStatus.CANCELLED_CLIENT;
       await manager.getRepository(Slot).update(appointment.slotId, { isBooked: false });

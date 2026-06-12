@@ -99,7 +99,7 @@ function TimePicker({
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const { master } = useMaster();
+  const { master, refresh } = useMaster();
   const masterId = master?.id ?? '';
 
   // ── Theme ──
@@ -156,6 +156,8 @@ export default function SettingsPage() {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      // Оновлюємо профіль у контексті, щоб «незбережені зміни» зникли.
+      refresh().catch(() => {});
     } catch {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
     } finally {
@@ -163,8 +165,61 @@ export default function SettingsPage() {
     }
   }
 
+  const dirty = !!master && (
+    currentTheme !== master.theme ||
+    rem1Enabled !== master.reminder1Enabled ||
+    rem1Hours !== master.reminder1Hours ||
+    rem2Enabled !== master.reminder2Enabled ||
+    rem2Hours !== master.reminder2Hours ||
+    autoConfirm !== master.autoConfirm ||
+    cancellationHours !== master.cancellationHours ||
+    maxPerDay !== master.maxBookingsPerDayPerClient ||
+    workStart !== master.defaultWorkStart ||
+    workEnd !== master.defaultWorkEnd ||
+    slotDuration !== master.defaultSlotDuration ||
+    breakMinutes !== master.defaultBreakMinutes
+  );
+
+  function discard() {
+    if (!master) return;
+    const t = (master.theme && master.theme in THEMES ? master.theme : currentTheme) as ThemeName;
+    setCurrentTheme(t); applyTheme(t);
+    setRem1Enabled(master.reminder1Enabled); setRem1Hours(master.reminder1Hours);
+    setRem2Enabled(master.reminder2Enabled); setRem2Hours(master.reminder2Hours);
+    setAutoConfirm(master.autoConfirm); setCancellationHours(master.cancellationHours);
+    setMaxPerDay(master.maxBookingsPerDayPerClient);
+    setWorkStart(master.defaultWorkStart); setWorkEnd(master.defaultWorkEnd);
+    setSlotDuration(master.defaultSlotDuration); setBreakMinutes(master.defaultBreakMinutes);
+  }
+
   return (
-    <div className="flex flex-col px-4 pt-6 pb-32">
+    <div className="flex flex-col px-4 pt-6 pb-12">
+      {/* Sticky save-бар — зʼявляється лише за наявності незбережених змін */}
+      {dirty && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 30,
+          margin: '-24px -16px 14px', padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--tg-theme-secondary-bg-color)',
+          borderBottom: '0.5px solid var(--theme-glow-color)',
+          boxShadow: 'var(--theme-shadow)',
+        }}>
+          <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--tg-theme-text-color)' }}>
+            Незбережені зміни
+          </span>
+          <button onClick={discard} disabled={saving}
+            style={{ fontSize: 13, padding: '7px 12px', borderRadius: 10, color: 'var(--tg-theme-hint-color)', background: 'transparent' }}>
+            Скасувати
+          </button>
+          <button onClick={saveAll} disabled={saving}
+            style={{ fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 10,
+              color: 'var(--tg-theme-button-text-color)', background: 'var(--tg-theme-button-color)',
+              boxShadow: 'var(--theme-btn-shadow)', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Зберігаємо…' : 'Зберегти'}
+          </button>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold mb-1 px-1" style={{ color: 'var(--tg-theme-text-color)' }}>
         Налаштування
       </h1>
@@ -417,19 +472,11 @@ export default function SettingsPage() {
         </Row>
       </Card>
 
-      {/* ── SAVE ── */}
-      <button
-        onClick={saveAll}
-        disabled={saving}
-        className="w-full mt-8 py-4 rounded-2xl font-semibold text-base transition-all"
-        style={{
-          background: 'var(--tg-theme-button-color)',
-          color: 'var(--tg-theme-button-text-color)',
-          boxShadow: saving ? 'none' : 'var(--theme-btn-shadow)',
-          opacity: saving ? 0.7 : 1,
-        }}>
-        {saving ? 'Зберігаємо...' : saved ? '✓ Збережено' : 'Зберегти налаштування'}
-      </button>
+      {saved && !dirty && (
+        <p className="text-center text-sm mt-6" style={{ color: 'var(--tg-theme-button-color)' }}>
+          Збережено
+        </p>
+      )}
     </div>
   );
 }

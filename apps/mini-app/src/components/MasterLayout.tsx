@@ -9,7 +9,7 @@ const tabs = [
   { to: '/master/clients',   icon: Users,     label: 'Клієнти' },
   { to: '/master/services',  icon: Scissors,  label: 'Послуги' },
   { to: '/master/analytics', icon: BarChart2, label: 'Аналітика' },
-  { to: '/master/settings',  icon: Settings,  label: 'Тема' },
+  { to: '/master/settings',  icon: Settings,  label: 'Налашт.' },
 ];
 
 export default function MasterLayout() {
