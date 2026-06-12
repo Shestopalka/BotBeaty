@@ -12,7 +12,7 @@ import SlotsPage from './pages/master/SlotsPage';
 import SettingsPage from './pages/master/SettingsPage';
 import OnboardingPage from './pages/onboarding/OnboardingPage';
 import BookingPage from './pages/client/BookingPage';
-import { Paywall } from './components/Paywall';
+import { BillingPage } from './pages/master/BillingPage';
 import { applyTheme, getSavedTheme } from './themes';
 
 try {
@@ -59,10 +59,10 @@ function MasterGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // Підписка лапснула — показуємо paywall замість кабінету.
+  // Підписка лапснула — показуємо сторінку тарифів замість кабінету.
   const sub = master?.subscriptionStatus;
   if (sub === 'past_due' || sub === 'canceled') {
-    return <Paywall status={sub} onRefresh={refresh} />;
+    return <BillingPage mode="locked" onRefresh={refresh} />;
   }
 
   return <>{children}</>;
@@ -86,8 +86,10 @@ function MasterApp() {
             <Route path="services"  element={<ServicesPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="settings"  element={<SettingsPage />} />
+            <Route path="billing"   element={<BillingPage mode="manage" />} />
           </Route>
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/billing" element={<BillingPage mode="welcome" />} />
           <Route path="*" element={<Navigate to="/master/home" replace />} />
         </Routes>
       </UIProvider>

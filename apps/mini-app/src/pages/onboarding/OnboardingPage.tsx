@@ -388,8 +388,8 @@ function DoneStep({ username }: { username: string }) {
         ))}
       </div>
 
-      <Btn onClick={() => window.location.href = '/master/home'} className="mt-8">
-        Відкрити кабінет
+      <Btn onClick={() => window.location.href = '/billing'} className="mt-8">
+        Далі
       </Btn>
     </div>
   );
