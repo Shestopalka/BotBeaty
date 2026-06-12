@@ -5,7 +5,7 @@ import { uk } from 'date-fns/locale';
 import { Calendar, Clock, Users, Scissors, BarChart2, Settings, ChevronRight, Check, Copy } from 'lucide-react';
 import { useMaster } from '../../context/MasterContext';
 import { appointmentsApi, analyticsApi, mastersApi, slotsApi } from '../../api/client';
-import { addDays } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 
 interface Apt {
   id: string;
@@ -49,7 +49,9 @@ export default function HomePage() {
     mastersApi.getById(masterId)
       .then((m) => { setServices(m?.services ?? []); setBotUsername(m?.botUsername ?? ''); })
       .catch(() => {});
-    const from = new Date().toISOString();
+    // Рахуємо слоти від ПОЧАТКУ сьогодні (а не від поточного моменту),
+    // щоб сьогоднішні слоти лічились навіть якщо їх час уже минув.
+    const from = startOfDay(new Date()).toISOString();
     const to = addDays(new Date(), 30).toISOString();
     slotsApi.getForMaster(masterId, from, to)
       .then((s) => setSlotsCount(Array.isArray(s) ? s.length : 0))
