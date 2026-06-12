@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay, addMonths, getDaysInMonth, startOfMonth } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, X, Lock } from 'lucide-react';
 import { slotsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
@@ -167,8 +167,10 @@ export default function SlotsPage() {
               >
                 <div>
                   <p className="font-semibold text-sm">{format(new Date(slot.startAt), 'HH:mm')}</p>
-                  <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
-                    {slot.isBooked ? '🔒 Зайнято' : `до ${format(new Date(slot.endAt), 'HH:mm')}`}
+                  <p className="text-xs flex items-center gap-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                    {slot.isBooked
+                      ? (<><Lock size={11} /> Зайнято</>)
+                      : `до ${format(new Date(slot.endAt), 'HH:mm')}`}
                   </p>
                 </div>
                 {!slot.isBooked && (

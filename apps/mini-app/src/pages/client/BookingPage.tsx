@@ -5,6 +5,7 @@ import { uk } from 'date-fns/locale';
 import { mastersApi, slotsApi, appointmentsApi } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
 import { applyTheme, THEMES, ThemeName } from '../../themes';
+import { Illustration } from '../../components/Illustration';
 
 type Step = 'service' | 'slot' | 'confirm' | 'success' | 'cancelled';
 
@@ -126,7 +127,9 @@ export default function BookingPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-6 gap-3 text-center"
         style={{ background: 'var(--tg-theme-bg-color)' }}>
-        <span style={{ fontSize: 48 }}>🔍</span>
+        <span style={{ color: 'var(--tg-theme-hint-color)', opacity: 0.6 }}>
+          <Illustration name="sparkle" size={72} />
+        </span>
         <p className="font-bold text-lg" style={{ color: 'var(--tg-theme-text-color)' }}>
           Майстра не знайдено
         </p>
@@ -268,7 +271,7 @@ export default function BookingPage() {
             className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50"
             style={{ background: 'var(--tg-theme-button-color)' }}
           >
-            {booking ? 'Бронюємо...' : '✅ Підтвердити запис'}
+            {booking ? 'Бронюємо...' : 'Підтвердити запис'}
           </button>
         </div>
       )}
@@ -276,9 +279,9 @@ export default function BookingPage() {
       {/* Step: успіх */}
       {step === 'success' && selectedService && selectedSlot && (
         <div className="flex flex-col items-center px-4 py-12 gap-4">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-            style={{ background: 'var(--theme-pill-bg)' }}>
-            🎉
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+            <Illustration name="sparkle" size={38} />
           </div>
           <h2 className="text-2xl font-bold text-center" style={{ color: 'var(--tg-theme-text-color)' }}>
             Запис підтверджено!

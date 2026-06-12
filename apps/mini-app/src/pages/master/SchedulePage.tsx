@@ -4,6 +4,7 @@ import { uk } from 'date-fns/locale';
 import { Check, X, Clock, Calendar, UserX } from 'lucide-react';
 import { appointmentsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { Illustration } from '../../components/Illustration';
 
 interface Appointment {
   id: string;
@@ -106,7 +107,9 @@ export default function SchedulePage() {
           </div>
         ) : todayAppointments.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
-            <Calendar size={40} style={{ color: 'var(--tg-theme-hint-color)', opacity: 0.25 }} />
+            <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.8 }}>
+              <Illustration name="appointments" size={84} />
+            </span>
             <p style={{ color: 'var(--tg-theme-hint-color)' }}>Записів немає</p>
           </div>
         ) : (

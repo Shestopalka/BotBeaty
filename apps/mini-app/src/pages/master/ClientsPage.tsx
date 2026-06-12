@@ -3,6 +3,7 @@ import { useUI } from '../../context/UIContext';
 import { Search, MoreVertical, Users, FileText } from 'lucide-react';
 import { clientsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { Illustration } from '../../components/Illustration';
 
 interface Client {
   id: string;
@@ -114,7 +115,9 @@ export default function ClientsPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
-            <Users size={40} style={{ color: 'var(--tg-theme-hint-color)', opacity: 0.25 }} />
+            <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.8 }}>
+              <Illustration name="clients" size={84} />
+            </span>
             <p style={{ color: 'var(--tg-theme-hint-color)' }}>Клієнтів не знайдено</p>
           </div>
         ) : (

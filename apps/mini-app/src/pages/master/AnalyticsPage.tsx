@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { TrendingUp, TrendingDown, Users, Calendar, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Award } from 'lucide-react';
 import { analyticsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 
@@ -16,8 +16,8 @@ interface DashboardStats {
 }
 
 const TAG_LABELS: Record<string, string> = {
-  new: '🆕 Нові', regular: '⭐ Постійні', trusted: '💎 Перевірені',
-  blocked: '🚫 Заблоковані', unwanted: '⚠️ Небажані',
+  new: 'Нові', regular: 'Постійні', trusted: 'Перевірені',
+  blocked: 'Заблоковані', unwanted: 'Небажані',
 };
 
 function GrowthBadge({ value }: { value: number }) {
@@ -148,7 +148,9 @@ export default function AnalyticsPage() {
 
       {/* Топ послуги */}
       <div className="mx-4 rounded-2xl p-4 mb-4" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
-        <p className="text-sm font-medium mb-3">🏆 Топ-послуги</p>
+        <p className="text-sm font-medium mb-3 flex items-center gap-1.5">
+          <Award size={15} style={{ color: 'var(--tg-theme-button-color)' }} /> Топ-послуги
+        </p>
         {s.topServices.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Немає завершених записів</p>
         ) : (
@@ -160,7 +162,7 @@ export default function AnalyticsPage() {
                 <div key={svc.name}>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm font-medium truncate flex-1 mr-2">
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {svc.name}
+                      {i + 1}. {svc.name}
                     </span>
                     <div className="text-right flex-shrink-0">
                       <span className="text-xs font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
@@ -186,7 +188,9 @@ export default function AnalyticsPage() {
 
       {/* Клієнти по тегах */}
       <div className="mx-4 rounded-2xl p-4" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
-        <p className="text-sm font-medium mb-3">👥 Клієнти по категоріях</p>
+        <p className="text-sm font-medium mb-3 flex items-center gap-1.5">
+          <Users size={15} style={{ color: 'var(--tg-theme-button-color)' }} /> Клієнти по категоріях
+        </p>
         {s.clientsByTag.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Клієнтів ще немає</p>
         ) : (

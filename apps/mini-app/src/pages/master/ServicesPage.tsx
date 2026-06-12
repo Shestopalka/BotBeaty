@@ -3,6 +3,7 @@ import { useUI } from '../../context/UIContext';
 import { Plus, Pencil, Trash2, Clock, Scissors } from 'lucide-react';
 import api from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { Illustration } from '../../components/Illustration';
 
 interface Service {
   id: string;
@@ -84,7 +85,9 @@ export default function ServicesPage() {
           </div>
         ) : services.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
-            <Scissors size={40} style={{ color: 'var(--tg-theme-hint-color)', opacity: 0.25 }} />
+            <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.8 }}>
+              <Illustration name="services" size={84} />
+            </span>
             <p style={{ color: 'var(--tg-theme-hint-color)' }}>Додайте свої послуги</p>
           </div>
         ) : (
