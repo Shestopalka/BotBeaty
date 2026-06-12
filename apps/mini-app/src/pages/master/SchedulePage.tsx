@@ -29,18 +29,21 @@ const TAG_ICONS: Record<string, string> = {
   new: '✦', regular: '★', trusted: '◆', blocked: '✕', unwanted: '△',
 };
 
-function getWeekDays() {
-  return Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
-}
-
 export default function SchedulePage() {
   const { master } = useMaster();
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const masterId = master?.id ?? '';
+  const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 380);
 
   useEffect(() => { if (masterId) loadAppointments(); }, [selectedDate, masterId]);
+
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   async function loadAppointments() {
     setLoading(true);
@@ -59,7 +62,9 @@ export default function SchedulePage() {
     } catch { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error'); }
   }
 
-  const weekDays = getWeekDays();
+  // Адаптивна к-сть дат: 7 на телефоні, більше — на ширшому екрані.
+  const dayCount = Math.min(30, Math.max(7, Math.floor((vw - 48) / 54)));
+  const weekDays = Array.from({ length: dayCount }, (_, i) => addDays(startOfDay(new Date()), i));
   const todayAppointments = appointments.filter(apt =>
     isSameDay(new Date(apt.slot?.startAt ?? Date.now()), selectedDate)
   );
