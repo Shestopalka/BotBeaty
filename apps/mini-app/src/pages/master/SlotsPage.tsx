@@ -336,7 +336,11 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
   const [duration, setDuration] = useState(defaultSlotDuration);
   const [breakMin, setBreakMin] = useState(defaultBreakMinutes);
   const [selectedDays, setSelectedDays] = useState<string[]>([format(date, 'yyyy-MM-dd')]);
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [saving, setSaving] = useState(false);
+
+  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const rangeMin = toMin(endTime) - toMin(startTime);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(startOfDay(new Date()), i);
@@ -356,10 +360,19 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
   }
 
   async function handleSave() {
-    if (!selectedDays.length) return;
     setSaving(true);
     try {
-      await slotsApi.createBulk({ masterId, dates: selectedDays, startTime, endTime, slotDurationMinutes: duration, breakMinutes: breakMin });
+      if (mode === 'manual') {
+        // Один кастомний слот на обраний день: тривалість = весь діапазон.
+        if (rangeMin <= 0) { setSaving(false); return; }
+        await slotsApi.createBulk({
+          masterId, dates: [format(date, 'yyyy-MM-dd')],
+          startTime, endTime, slotDurationMinutes: rangeMin, breakMinutes: 0,
+        });
+      } else {
+        if (!selectedDays.length) { setSaving(false); return; }
+        await slotsApi.createBulk({ masterId, dates: selectedDays, startTime, endTime, slotDurationMinutes: duration, breakMinutes: breakMin });
+      }
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       handleSaved();
     } catch {
@@ -369,7 +382,9 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
     }
   }
 
-  const totalSlots = previewCount() * selectedDays.length;
+  const totalSlots = mode === 'manual'
+    ? (rangeMin > 0 ? 1 : 0)
+    : previewCount() * selectedDays.length;
 
 
 
@@ -390,22 +405,44 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
 
         {/* Scrollable */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-2 min-h-0">
-          <div className="mb-4">
-            <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Дні</p>
-            <div className="flex gap-2 flex-wrap">
-              {weekDays.map(({ date: d, str }) => (
-                <button key={str} onClick={() => toggleDay(str)}
-                  className="flex flex-col items-center py-2 px-3 rounded-xl text-sm"
-                  style={selectedDays.includes(str)
-                    ? { background: 'var(--tg-theme-button-color)', color: '#fff' }
-                    : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}
-                >
-                  <span className="text-xs opacity-70">{format(d, 'EEE', { locale: uk })}</span>
-                  <span className="font-bold">{format(d, 'd')}</span>
-                </button>
-              ))}
-            </div>
+          {/* Режим: авто-сітка або один кастомний слот */}
+          <div className="flex gap-1 p-1 rounded-2xl mb-4" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            {([['auto', 'Авто'], ['manual', 'Вручну']] as const).map(([m, label]) => (
+              <button key={m} onClick={() => setMode(m)}
+                className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                style={mode === m
+                  ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                  : { background: 'transparent', color: 'var(--tg-theme-hint-color)' }}>
+                {label}
+              </button>
+            ))}
           </div>
+
+          {mode === 'manual' ? (
+            <div className="mb-4">
+              <p className="text-xs mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>День</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
+                {format(date, 'd MMMM, EEEE', { locale: uk })}
+              </p>
+            </div>
+          ) : (
+            <div className="mb-4">
+              <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Дні</p>
+              <div className="flex gap-2 flex-wrap">
+                {weekDays.map(({ date: d, str }) => (
+                  <button key={str} onClick={() => toggleDay(str)}
+                    className="flex flex-col items-center py-2 px-3 rounded-xl text-sm"
+                    style={selectedDays.includes(str)
+                      ? { background: 'var(--tg-theme-button-color)', color: '#fff' }
+                      : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}
+                  >
+                    <span className="text-xs opacity-70">{format(d, 'EEE', { locale: uk })}</span>
+                    <span className="font-bold">{format(d, 'd')}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
@@ -426,34 +463,52 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
             </div>
           </div>
 
-          <div className="mb-4">
-            <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Тривалість слоту</p>
-            <div className="flex gap-2 flex-wrap">
-              {DURATIONS.map(d => (
-                <button key={d} onClick={() => setDuration(d)} className="px-4 py-2 rounded-xl text-sm"
-                  style={duration === d
-                    ? { background: 'var(--tg-theme-button-color)', color: '#fff' }
-                    : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
-                  {d} хв
-                </button>
-              ))}
+          {mode === 'auto' && (
+            <div className="mb-4">
+              <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Тривалість слоту</p>
+              <div className="flex gap-2 flex-wrap">
+                {DURATIONS.map(d => (
+                  <button key={d} onClick={() => setDuration(d)} className="px-4 py-2 rounded-xl text-sm"
+                    style={duration === d
+                      ? { background: 'var(--tg-theme-button-color)', color: '#fff' }
+                      : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+                    {d} хв
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="mb-4">
-            <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
-              Перерва між слотами: <strong>{breakMin} хв</strong>
-            </p>
-            <input type="range" min={0} max={60} step={5} value={breakMin}
-              onChange={e => setBreakMin(+e.target.value)} className="w-full" />
-          </div>
+          {mode === 'auto' && (
+            <div className="mb-4">
+              <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                Перерва між слотами: <strong>{breakMin} хв</strong>
+              </p>
+              <input type="range" min={0} max={60} step={5} value={breakMin}
+                onChange={e => setBreakMin(+e.target.value)} className="w-full" />
+            </div>
+          )}
 
           <div className="rounded-xl p-3 text-center" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
-            <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Буде створено приблизно</p>
-            <p className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>{totalSlots}</p>
-            <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
-              слотів на {selectedDays.length} {selectedDays.length === 1 ? 'день' : 'дні'}
-            </p>
+            {mode === 'manual' ? (
+              <>
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Буде створено слот</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
+                  {rangeMin > 0 ? `${startTime}–${endTime}` : '—'}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  {rangeMin > 0 ? `${rangeMin} хв` : 'Кінець має бути пізніше за початок'}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Буде створено приблизно</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>{totalSlots}</p>
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  слотів на {selectedDays.length} {selectedDays.length === 1 ? 'день' : 'дні'}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -470,7 +525,7 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
               boxShadow: 'var(--theme-btn-shadow)',
             }}
           >
-            {saving ? 'Зберігаємо...' : totalSlots > 0 ? `Створити ${totalSlots} слотів` : 'Оберіть параметри'}
+            {saving ? 'Зберігаємо...' : totalSlots === 0 ? 'Оберіть параметри' : mode === 'manual' ? 'Створити слот' : `Створити ${totalSlots} слотів`}
           </button>
         </div>
       </div>
