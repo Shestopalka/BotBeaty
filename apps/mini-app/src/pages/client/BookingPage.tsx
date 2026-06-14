@@ -37,6 +37,11 @@ export default function BookingPage() {
   const [booking, setBooking] = useState(false);
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [phone, setPhone] = useState('');
+
+  // Валідний український номер: 10–13 цифр (можна з +).
+  const phoneDigits = phone.replace(/\D/g, '');
+  const phoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 13;
 
   const tg = window.Telegram?.WebApp;
 
@@ -101,6 +106,7 @@ export default function BookingPage() {
         clientName,
         serviceId: selectedService.id,
         slotId: selectedSlot.id,
+        clientPhone: phone.trim(),
       });
       setAppointmentId(created?.id ?? null);
       tg?.HapticFeedback?.notificationOccurred('success');
@@ -349,9 +355,33 @@ export default function BookingPage() {
             </div>
           </div>
 
+          {/* Номер телефону — щоб майстер міг зателефонувати, якщо не вийде в Telegram */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
+              Ваш номер телефону
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+380 67 123 45 67"
+              className="w-full px-4 py-3 rounded-2xl text-base outline-none"
+              style={{
+                background: 'var(--tg-theme-bg-color)',
+                color: 'var(--tg-theme-text-color)',
+                border: '1.5px solid var(--theme-glow-color, var(--tg-theme-hint-color))',
+              }}
+            />
+            <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              Майстер зателефонує, якщо не вдасться звʼязатися в Telegram.
+            </p>
+          </div>
+
           <button
             onClick={confirmBooking}
-            disabled={booking}
+            disabled={booking || !phoneValid}
             className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50"
             style={{ background: 'var(--tg-theme-button-color)' }}
           >

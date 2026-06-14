@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useUI } from '../../context/UIContext';
-import { Search, MoreVertical, Users, FileText } from 'lucide-react';
+import { Search, MoreVertical, Users, FileText, Phone } from 'lucide-react';
 import { clientsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
@@ -153,6 +153,13 @@ export default function ClientsPage() {
                       @{client.username}
                     </p>
                   )}
+                  {client.phone && (
+                    <a href={`tel:${client.phone}`} onClick={e => e.stopPropagation()}
+                      className="text-xs mt-0.5 truncate block"
+                      style={{ color: 'var(--tg-theme-link-color)' }}>
+                      📞 {client.phone}
+                    </a>
+                  )}
                 </div>
 
                 <button onClick={() => setSelected(client)} className="p-2 rounded-xl"
@@ -265,6 +272,17 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
               </div>
             </div>
           </div>
+
+          {/* Телефон — щоб майстер міг зателефонувати */}
+          {client.phone && (
+            <a href={`tel:${client.phone}`}
+              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl text-sm font-medium mb-3"
+              style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+              <Phone size={16} style={{ color: 'var(--tg-theme-button-color)' }} />
+              <span className="flex-1">{client.phone}</span>
+              <span className="text-xs" style={{ color: 'var(--tg-theme-button-color)' }}>Подзвонити</span>
+            </a>
+          )}
 
           {/* Нотатки */}
           <div className="mb-3">

@@ -23,6 +23,7 @@ export interface CreateAppointmentDto {
   serviceId: string;
   slotId: string;
   clientNote?: string;
+  clientPhone?: string;
 }
 
 @Injectable()
@@ -82,13 +83,20 @@ export class AppointmentService {
         where: { telegramId: dto.clientTelegramId, masterId: dto.masterId },
       });
 
+      const phone = dto.clientPhone?.trim() || undefined;
+
       if (!client) {
         client = manager.getRepository(Client).create({
           telegramId: dto.clientTelegramId,
           fullName: dto.clientName,
           masterId: dto.masterId,
+          phone,
           tag: ClientTag.NEW,
         });
+        await manager.getRepository(Client).save(client);
+      } else if (phone && client.phone !== phone) {
+        // Оновлюємо номер, якщо клієнт вказав новий/інший.
+        client.phone = phone;
         await manager.getRepository(Client).save(client);
       }
 
