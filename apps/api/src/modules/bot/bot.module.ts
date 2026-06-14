@@ -13,12 +13,14 @@ import { BotRegistrationHandler } from './handlers/registration.handler';
 import { BotMasterMenuHandler } from './handlers/master-menu.handler';
 import { AppointmentCallbackHandler } from './handlers/appointment-callback.handler';
 import { ClientBotHandler } from './handlers/client-bot.handler';
+import { AppointmentModule } from '../appointment/appointment.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Master, Client, Appointment, Slot, AuditLog]),
     ConfigModule,
     BullModule.registerQueue({ name: 'notifications' }),
+    AppointmentModule,
   ],
   controllers: [BotController],
   providers: [

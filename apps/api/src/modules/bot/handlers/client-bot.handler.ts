@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Master } from '../../../database/entities/master.entity';
 import { Client, ClientTag } from '../../../database/entities/client.entity';
 import { Appointment, AppointmentStatus } from '../../../database/entities/appointment.entity';
+import { AppointmentService } from '../../appointment/appointment.service';
 
 const SPECIALTY_LABELS: Record<string, string> = {
   manicure: '💅 Манікюр', pedicure: '🦶 Педикюр', eyelashes: '👁️ Вії',
@@ -26,6 +27,7 @@ export class ClientBotHandler {
     private clientRepo: Repository<Client>,
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
+    private appointmentService: AppointmentService,
   ) {}
 
   /**
@@ -111,21 +113,52 @@ export class ClientBotHandler {
       cancelled_client: '❌', cancelled_master: '❌', no_show: '🚫',
     };
 
+    const now = Date.now();
+    const cancelButtons: any[][] = [];
+
     const lines = appointments.map(apt => {
       // service/slot можуть бути null (напр. послугу видалили) — не падаємо
-      const time = apt.slot?.startAt
-        ? new Date(apt.slot.startAt).toLocaleString('uk-UA', {
+      const startMs = apt.slot?.startAt ? new Date(apt.slot.startAt).getTime() : 0;
+      const time = startMs
+        ? new Date(startMs).toLocaleString('uk-UA', {
             timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
           })
         : 'час не вказано';
       const serviceName = apt.service?.name ?? 'Послуга';
+
+      // Кнопка скасування — лише для майбутніх активних записів.
+      const cancellable =
+        (apt.status === AppointmentStatus.PENDING || apt.status === AppointmentStatus.CONFIRMED) &&
+        startMs > now;
+      if (cancellable) {
+        cancelButtons.push([{ text: `❌ Скасувати ${time}`, callback_data: `cancel_my_apt:${apt.id}` }]);
+      }
       return `${STATUS_EMOJI[apt.status] ?? '•'} <b>${serviceName}</b> — ${time}`;
     });
 
     await ctx.reply(
       `📋 <b>Ваші останні записи:</b>\n\n${lines.join('\n')}`,
-      { parse_mode: 'HTML' },
+      {
+        parse_mode: 'HTML',
+        reply_markup: cancelButtons.length ? { inline_keyboard: cancelButtons } : undefined,
+      },
     );
+  }
+
+  /**
+   * Клієнт скасовує свій запис (кнопка «Скасувати» у «Мої записи»).
+   * Бекенд перевіряє власність і ліміт скасування (cancellationHours).
+   */
+  async handleCancelMyAppointment(ctx: any, appointmentId: string) {
+    const telegramId = String(ctx.from.id);
+    try {
+      await this.appointmentService.cancelByClient(appointmentId, telegramId);
+      await ctx.answerCbQuery('Запис скасовано');
+      await ctx.reply('❌ Ваш запис скасовано. Будемо раді бачити вас знову!');
+    } catch (e: any) {
+      const msg = e?.response?.message || e?.message || 'Не вдалось скасувати';
+      await ctx.answerCbQuery(msg, { show_alert: true });
+    }
   }
 
   /**

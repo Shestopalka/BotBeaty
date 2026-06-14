@@ -287,6 +287,10 @@ export class BotService implements OnModuleInit {
         await this.clientBotHandler.handleContactMaster(ctx, master);
         return;
       }
+      if (data.startsWith('cancel_my_apt:')) {
+        await this.clientBotHandler.handleCancelMyAppointment(ctx, data.split(':')[1]);
+        return;
+      }
 
       // Кнопки для майстра (confirm/cancel/complete)
       if (

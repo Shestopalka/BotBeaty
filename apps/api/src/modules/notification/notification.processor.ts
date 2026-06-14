@@ -122,6 +122,22 @@ export class NotificationProcessor extends WorkerHost {
         this.logger.warn(`sendToClient (status change) failed: ${e.message}`);
       }
     }
+
+    // Клієнт скасував — повідомляємо МАЙСТРА (слот звільнився).
+    if (data.newStatus === AppointmentStatus.CANCELLED_CLIENT && apt.master) {
+      const time = apt.slot?.startAt
+        ? new Date(apt.slot.startAt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' })
+        : '';
+      try {
+        await this.botService.sendToMaster(
+          apt.master,
+          `❌ <b>Клієнт скасував запис</b>\n👤 ${apt.client?.fullName ?? '—'}\n💅 ${apt.service?.name ?? '—'}\n📅 ${time}`,
+          { parse_mode: 'HTML' },
+        );
+      } catch (e) {
+        this.logger.warn(`sendToMaster (client cancel) failed: ${e.message}`);
+      }
+    }
   }
 
   private async handleReminder(data: { appointmentId: string }, hours: string) {
