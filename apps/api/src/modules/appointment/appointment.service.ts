@@ -106,8 +106,9 @@ export class AppointmentService {
       }
 
       // Ліміт записів на клієнта НА ДЕНЬ — налаштовується майстром.
-      // Рахуємо активні (pending/confirmed) записи цього клієнта на той самий
-      // КИЇВСЬКИЙ день, що й обраний слот.
+      // Рахуємо активні (pending/confirmed) МАЙБУТНІ записи цього клієнта на той
+      // самий КИЇВСЬКИЙ день, що й обраний слот. Записи, час яких уже минув, не
+      // блокують новий — клієнт може записатись на пізніший час того ж дня.
       const masterLimitRow = await manager.getRepository(Master).findOne({
         where: { id: dto.masterId },
         select: ['maxBookingsPerDayPerClient', 'subscriptionStatus', 'trialEndsAt', 'currentPeriodEnd'],
@@ -134,6 +135,7 @@ export class AppointmentService {
           st: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED],
         })
         .andWhere('apt.deletedAt IS NULL')
+        .andWhere('s."startAt" > now()') // минулі записи дня не враховуємо
         .andWhere(
           `(s."startAt" AT TIME ZONE 'Europe/Kyiv')::date = (:slotStart::timestamptz AT TIME ZONE 'Europe/Kyiv')::date`,
           { slotStart: slot.startAt.toISOString() },
