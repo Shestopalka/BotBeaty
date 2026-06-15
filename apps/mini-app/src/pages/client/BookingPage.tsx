@@ -77,13 +77,34 @@ export default function BookingPage() {
     if (step === 'slot') loadSlots();
   }, [step, selectedDate]);
 
+  // Telegram тримає webview «живим»: при повторному відкритті стейт (зокрема
+  // вибрана дата) лишається з минулого сеансу. Якщо обрана дата вже в минулому —
+  // повертаємо на сьогодні. Перевіряємо на маунті та коли застосунок знову видно.
+  useEffect(() => {
+    function syncToday() {
+      const today = startOfDay(new Date());
+      setSelectedDate((prev) => (prev.getTime() < today.getTime() ? today : prev));
+    }
+    syncToday();
+    document.addEventListener('visibilitychange', syncToday);
+    return () => document.removeEventListener('visibilitychange', syncToday);
+  }, []);
+
   async function loadSlots() {
     setLoading(true);
     const from = selectedDate.toISOString();
     const to = addDays(selectedDate, 1).toISOString();
     try {
       const data = await slotsApi.getAvailable(masterId!, from, to);
-      setSlots(data.filter((s: Slot) => isSameDay(new Date(s.startAt), selectedDate)));
+      const now = Date.now();
+      // Показуємо лише слоти обраного дня, час яких ще не минув.
+      setSlots(
+        data.filter(
+          (s: Slot) =>
+            isSameDay(new Date(s.startAt), selectedDate) &&
+            new Date(s.startAt).getTime() > now,
+        ),
+      );
     } catch {
       setSlots([]);
     } finally {

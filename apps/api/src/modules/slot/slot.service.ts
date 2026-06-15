@@ -115,11 +115,16 @@ export class SlotService {
    * Доступні (вільні) слоти майстра — для сторінки бронювання клієнта.
    */
   async getAvailable(masterId: string, from: Date, to: Date): Promise<Slot[]> {
+    // Клієнт ніколи не повинен бачити минулі слоти. Навіть якщо фронт надішле
+    // початок дня (00:00), зміщуємо нижню межу до поточного моменту.
+    const now = new Date();
+    const effectiveFrom = from.getTime() < now.getTime() ? now : from;
+    if (effectiveFrom.getTime() >= to.getTime()) return [];
     return this.slotRepo.find({
       where: {
         masterId,
         isBooked: false,
-        startAt: Between(from, to),
+        startAt: Between(effectiveFrom, to),
         deletedAt: IsNull(),
       },
       order: { startAt: 'ASC' },
