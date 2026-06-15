@@ -26,7 +26,6 @@ export interface Master {
   trialEndsAt?: string | null;
   currentPeriodEnd?: string | null;
   plan?: string;
-  accentColor?: string | null;
 
   // Slot defaults
   defaultWorkStart: string;
