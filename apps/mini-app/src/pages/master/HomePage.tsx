@@ -86,9 +86,14 @@ export default function HomePage() {
 
   return (
     <div className="px-4 pt-6 pb-4 flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Avatar name={master?.fullName} masterId={master?.id} avatarUrl={master?.avatarUrl} size={44} />
+      {/* Header — профіль у власній картці, щоб візуально виділявся */}
+      <div className="flex items-center gap-3 rounded-2xl px-4 py-3.5"
+        style={{
+          background: 'var(--tg-theme-secondary-bg-color)',
+          border: '0.5px solid var(--theme-glow-color)',
+          boxShadow: 'var(--theme-shadow)',
+        }}>
+        <Avatar name={master?.fullName} masterId={master?.id} avatarUrl={master?.avatarUrl} size={48} />
         <div className="flex-1 min-w-0">
           <p className="text-base font-bold leading-tight" style={{ color: 'var(--tg-theme-text-color)' }}>
             Вітаю, {firstName}
