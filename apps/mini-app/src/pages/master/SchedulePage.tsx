@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Check, X, Clock, Calendar, UserX } from 'lucide-react';
+import { Check, X, Clock, Calendar, UserX, Phone, Copy } from 'lucide-react';
 import { appointmentsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
@@ -12,7 +12,7 @@ interface Appointment {
   status: string;
   pricePaid: number;
   currency: string;
-  client: { fullName: string; tag: string } | null;
+  client: { fullName: string; tag: string; phone?: string | null } | null;
   service: { name: string; durationMinutes: number; priceType?: PriceType; price?: number; priceMax?: number | null } | null;
   slot: { startAt: string; endAt: string } | null;
 }
@@ -139,6 +139,17 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
   const startTime = format(new Date(apt.slot?.startAt ?? Date.now()), 'HH:mm');
   const endTime = format(new Date(apt.slot?.endAt ?? Date.now()), 'HH:mm');
   const status = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG.pending;
+  const phone = apt.client?.phone;
+  const [copied, setCopied] = useState(false);
+
+  function copyPhone() {
+    if (!phone) return;
+    navigator.clipboard?.writeText(phone).then(() => {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
 
   return (
     <div className="rounded-2xl p-4 space-y-3" style={{
@@ -166,6 +177,23 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
           {apt.client?.fullName ?? 'Клієнт'}
         </span>
       </div>
+
+      {phone && (
+        <div className="flex items-center gap-2">
+          <a href={`tel:${phone}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium flex-1"
+            style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+            <Phone size={14} />
+            {phone}
+          </a>
+          <button onClick={copyPhone}
+            className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0"
+            style={{ background: 'var(--theme-pill-bg)', color: copied ? '#0f6e56' : 'var(--tg-theme-hint-color)' }}
+            aria-label="Скопіювати номер">
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-between items-center">
         <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
