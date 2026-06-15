@@ -54,24 +54,19 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!masterId) {
-      console.error('[BookingPage] masterId is undefined');
       setMasterLoading(false);
       return;
     }
-    console.log('[BookingPage] loading master:', masterId);
     setMasterLoading(true);
     mastersApi.getById(masterId)
       .then((data) => {
-        console.log('[BookingPage] master loaded:', data?.fullName, 'theme:', data?.theme);
         setMaster(data);
         // Застосовуємо тему майстра для клієнта
         if (data?.theme && data.theme in THEMES) {
           applyTheme(data.theme as ThemeName);
         }
       })
-      .catch((err) => {
-        console.error('[BookingPage] failed to load master:', err?.response?.status, err?.message);
-      })
+      .catch(() => { /* показуємо екран «майстра не знайдено» нижче */ })
       .finally(() => setMasterLoading(false));
   }, [masterId]);
 
@@ -122,6 +117,15 @@ export default function BookingPage() {
     }
   }
 
+  // Показати зрозуміле повідомлення про помилку (бек повертає текст у message).
+  function showError(e: any, fallback: string) {
+    const msg = e?.response?.data?.message ?? fallback;
+    const text = Array.isArray(msg) ? msg.join(', ') : msg;
+    const a: any = window.Telegram?.WebApp;
+    if (a?.showAlert) a.showAlert(text);
+    else alert(text);
+  }
+
   async function confirmBooking() {
     if (!selectedSlot || !selectedService) return;
     // user може бути null у dev режимі — використовуємо fallback
@@ -142,8 +146,11 @@ export default function BookingPage() {
       setAppointmentId(created?.id ?? null);
       tg?.HapticFeedback?.notificationOccurred('success');
       setStep('success');
-    } catch {
+    } catch (e) {
       tg?.HapticFeedback?.notificationOccurred('error');
+      showError(e, 'Не вдалось створити запис. Спробуйте ще раз.');
+      // Слот міг щойно стати зайнятим — оновлюємо список і повертаємо до вибору часу.
+      setStep('slot');
     } finally {
       setBooking(false);
     }
@@ -156,8 +163,9 @@ export default function BookingPage() {
       await appointmentsApi.updateStatus(appointmentId, masterId, 'cancelled_client');
       tg?.HapticFeedback?.notificationOccurred('success');
       setStep('cancelled');
-    } catch {
+    } catch (e) {
       tg?.HapticFeedback?.notificationOccurred('error');
+      showError(e, 'Не вдалось скасувати запис.');
     } finally {
       setCancelling(false);
     }

@@ -5,6 +5,7 @@ import api from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
 import { formatPrice, PriceType } from '../../lib/price';
+import { showApiError } from '../../lib/notify';
 
 interface Service {
   id: string;
@@ -52,8 +53,8 @@ export default function ServicesPage() {
       setShowForm(false);
       setEditService(null);
       loadServices();
-    } catch {
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } catch (e) {
+      showApiError(e, 'Не вдалось зберегти послугу.');
     }
   }
 

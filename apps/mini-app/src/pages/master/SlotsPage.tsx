@@ -6,6 +6,7 @@ import { slotsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
+import { showApiError } from '../../lib/notify';
 
 interface Slot {
   id: string;
@@ -58,8 +59,8 @@ export default function SlotsPage() {
       await slotsApi.delete(id, masterId);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       loadSlots();
-    } catch {
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } catch (e) {
+      showApiError(e, 'Не вдалось видалити слот.');
     }
   }
 
@@ -375,8 +376,8 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
       }
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       handleSaved();
-    } catch {
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } catch (e) {
+      showApiError(e, 'Не вдалось створити слоти.');
     } finally {
       setSaving(false);
     }

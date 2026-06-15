@@ -3,6 +3,7 @@ import { Check, Bell, BellOff, Calendar, Clock, Zap, Ban } from 'lucide-react';
 import { THEMES, ThemeName, applyTheme, getSavedTheme } from '../../themes';
 import { mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { showApiError } from '../../lib/notify';
 
 // ─── Reusable components ─────────────────────────────────────────────────────
 
@@ -161,8 +162,8 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
       // Оновлюємо профіль у контексті, щоб «незбережені зміни» зникли.
       refresh().catch(() => {});
-    } catch {
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } catch (e) {
+      showApiError(e, 'Не вдалось зберегти налаштування.');
     } finally {
       setSaving(false);
     }

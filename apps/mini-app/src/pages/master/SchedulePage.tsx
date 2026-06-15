@@ -7,6 +7,7 @@ import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
 import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
+import { showApiError } from '../../lib/notify';
 
 interface Appointment {
   id: string;
@@ -62,7 +63,7 @@ export default function SchedulePage() {
       await appointmentsApi.updateStatus(id, masterId, status);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       loadAppointments();
-    } catch { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error'); }
+    } catch (e) { showApiError(e, 'Не вдалось оновити запис.'); }
   }
 
   // Адаптивна к-сть дат: 7 на телефоні, більше — на ширшому екрані.
@@ -346,10 +347,8 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
       });
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       onCreated(new Date(slot.startAt));
-    } catch (e: any) {
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
-      const msg = e?.response?.data?.message || 'Не вдалось створити запис';
-      (window.Telegram?.WebApp as any)?.showAlert?.(Array.isArray(msg) ? msg.join(', ') : msg);
+    } catch (e) {
+      showApiError(e, 'Не вдалось створити запис.');
     } finally {
       setSubmitting(false);
     }
