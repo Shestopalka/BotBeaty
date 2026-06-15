@@ -14,8 +14,9 @@ export enum ClientTag {
 @Entity('clients')
 @Index(['telegramId', 'masterId'], { unique: true }) // Один клієнт = одна картка у конкретного майстра
 export class Client extends BaseEntity {
-  @Column({ type: 'bigint' })
-  telegramId: string;
+  // Може бути null — для офлайн-клієнтів, яких майстер записав вручну.
+  @Column({ type: 'bigint', nullable: true })
+  telegramId: string | null;
 
   @Column({ nullable: true })
   username: string;

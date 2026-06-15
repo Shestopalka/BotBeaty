@@ -9,7 +9,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { AppointmentService, CreateAppointmentDto } from './appointment.service';
+import { AppointmentService, CreateAppointmentDto, CreateByMasterDto } from './appointment.service';
 import { AppointmentStatus } from '../../database/entities/appointment.entity';
 import {
   CurrentMasterId,
@@ -42,6 +42,15 @@ export class AppointmentController {
       clientTelegramId: String(user.id),
       clientName: dto.clientName || `${user.first_name} ${user.last_name ?? ''}`.trim(),
     });
+  }
+
+  // Майстер записує клієнта сам (телефонний/офлайн запис). masterId — з автентифікації.
+  @Post('by-master')
+  createByMaster(
+    @Body() dto: CreateByMasterDto,
+    @CurrentMasterId() masterId: string,
+  ) {
+    return this.appointmentService.createByMaster({ ...dto, masterId });
   }
 
   @Get('master/:masterId')

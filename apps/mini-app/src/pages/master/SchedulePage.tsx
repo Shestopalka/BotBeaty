@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Check, X, Clock, Calendar, UserX, Phone, Copy } from 'lucide-react';
-import { appointmentsApi } from '../../api/client';
+import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus } from 'lucide-react';
+import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
-import { formatPrice, PriceType } from '../../lib/price';
+import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
 
 interface Appointment {
   id: string;
@@ -37,6 +38,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(false);
   const masterId = master?.id ?? '';
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 380);
+  const [showBook, setShowBook] = useState(false);
 
   useEffect(() => { if (masterId) loadAppointments(); }, [selectedDate, masterId]);
 
@@ -72,11 +74,18 @@ export default function SchedulePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-5 pt-6 pb-2">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>Розклад</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
-          {format(selectedDate, 'd MMMM yyyy', { locale: uk })}
-        </p>
+      <div className="px-5 pt-6 pb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>Розклад</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
+            {format(selectedDate, 'd MMMM yyyy', { locale: uk })}
+          </p>
+        </div>
+        <button onClick={() => setShowBook(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold shrink-0"
+          style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
+          <Plus size={15} strokeWidth={2.5} /> Записати
+        </button>
       </div>
 
       {/* Тижневий календар */}
@@ -129,6 +138,15 @@ export default function SchedulePage() {
           ))
         )}
       </div>
+
+      {showBook && (
+        <BookClientSheet
+          masterId={masterId}
+          initialDate={selectedDate}
+          onClose={() => setShowBook(false)}
+          onCreated={(d) => { setShowBook(false); setSelectedDate(startOfDay(d)); loadAppointments(); }}
+        />
+      )}
     </div>
   );
 }
@@ -250,6 +268,218 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface SvcLite { id: string; name: string; durationMinutes: number; priceType?: PriceType; price: number; priceMax?: number | null; currency: string; isActive?: boolean; }
+interface ClientLite { id: string; fullName: string; phone?: string | null; tag: string; }
+interface SlotLite { id: string; startAt: string; }
+
+/** Шторка: майстер записує клієнта сам (існуючого або нового офлайн). */
+function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
+  masterId: string; initialDate: Date; onClose: () => void; onCreated: (d: Date) => void;
+}) {
+  const { hideNav, showNav } = useUI();
+  const [closing, setClosing] = useState(false);
+  const CLOSE_MS = 280;
+
+  const [services, setServices] = useState<SvcLite[]>([]);
+  const [clients, setClients] = useState<ClientLite[]>([]);
+  const [date, setDate] = useState(startOfDay(initialDate));
+  const [slots, setSlots] = useState<SlotLite[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  const [service, setService] = useState<SvcLite | null>(null);
+  const [slot, setSlot] = useState<SlotLite | null>(null);
+  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [search, setSearch] = useState('');
+  const [clientId, setClientId] = useState<string>('');
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    hideNav();
+    mastersApi.getById(masterId)
+      .then((m) => setServices((m?.services ?? []).filter((s: SvcLite) => s.isActive !== false)))
+      .catch(() => setServices([]));
+    clientsApi.getByMaster(masterId).then(setClients).catch(() => setClients([]));
+    return () => showNav();
+  }, []);
+
+  useEffect(() => {
+    setSlotsLoading(true);
+    setSlot(null);
+    const from = date.toISOString();
+    const to = addDays(date, 1).toISOString();
+    slotsApi.getAvailable(masterId, from, to)
+      .then((data: SlotLite[]) =>
+        setSlots(data.filter(s => isSameDay(new Date(s.startAt), date) && new Date(s.startAt).getTime() > Date.now())))
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [date, masterId]);
+
+  const days = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const filteredClients = clients.filter(c =>
+    c.tag !== 'blocked' && c.fullName.toLowerCase().includes(search.toLowerCase()));
+
+  const canSave = !!service && !!slot &&
+    (mode === 'existing' ? !!clientId : newName.trim().length > 0);
+
+  function handleClose() {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, CLOSE_MS);
+  }
+
+  async function submit() {
+    if (!canSave || !service || !slot) return;
+    setSubmitting(true);
+    try {
+      await appointmentsApi.createByMaster({
+        serviceId: service.id,
+        slotId: slot.id,
+        ...(mode === 'existing'
+          ? { clientId }
+          : { clientName: newName.trim(), clientPhone: newPhone.trim() || undefined }),
+      });
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      onCreated(new Date(slot.startAt));
+    } catch (e: any) {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+      const msg = e?.response?.data?.message || 'Не вдалось створити запис';
+      (window.Telegram?.WebApp as any)?.showAlert?.(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const inputStyle = { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' };
+
+  return (
+    <div className="fixed inset-0" style={{ zIndex: 200 }} onClick={handleClose}>
+      <div className={`${closing ? 'bb-backdrop-out' : 'bb-backdrop'} absolute inset-0 bg-black/40`} />
+      <div className={`${closing ? 'bb-sheet-out' : 'bb-sheet'} absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col`}
+        style={{ background: 'var(--tg-theme-bg-color)', boxShadow: '0 -8px 32px var(--theme-glow-color)', maxHeight: '92vh' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="pt-3 pb-1 flex justify-center flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--tg-theme-secondary-bg-color)' }} />
+        </div>
+        <div className="px-5 pb-2 flex-shrink-0">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>Записати клієнта</h2>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 pb-2 min-h-0 space-y-4">
+          {/* Послуга */}
+          <div>
+            <p className="text-xs mb-1.5" style={{ color: 'var(--tg-theme-hint-color)' }}>Послуга</p>
+            <div className="space-y-2">
+              {services.length === 0 && (
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Спершу додайте послуги.</p>
+              )}
+              {services.map(s => (
+                <button key={s.id} onClick={() => setService(s)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl text-left"
+                  style={{ background: 'var(--tg-theme-secondary-bg-color)',
+                    border: service?.id === s.id ? '1.5px solid var(--tg-theme-button-color)' : '1.5px solid transparent' }}>
+                  <span className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>{s.name} · {s.durationMinutes} хв</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>{formatPriceShort(s)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Дата + час */}
+          <div>
+            <p className="text-xs mb-1.5" style={{ color: 'var(--tg-theme-hint-color)' }}>Дата та час</p>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {days.map(d => {
+                const sel = isSameDay(d, date);
+                return (
+                  <button key={d.toISOString()} onClick={() => setDate(d)}
+                    className="flex flex-col items-center min-w-[46px] py-2 px-1 rounded-xl"
+                    style={sel
+                      ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                      : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+                    <span className="text-[10px] opacity-70">{format(d, 'EEE', { locale: uk })}</span>
+                    <span className="text-base font-bold">{format(d, 'd')}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {slotsLoading ? (
+              <p className="text-sm py-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Завантаження…</p>
+            ) : slots.length === 0 ? (
+              <p className="text-sm py-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Немає вільних слотів на цей день.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {slots.map(s => (
+                  <button key={s.id} onClick={() => setSlot(s)}
+                    className="py-2.5 rounded-xl text-sm font-medium"
+                    style={slot?.id === s.id
+                      ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                      : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+                    {format(new Date(s.startAt), 'HH:mm')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Клієнт */}
+          <div>
+            <p className="text-xs mb-1.5" style={{ color: 'var(--tg-theme-hint-color)' }}>Клієнт</p>
+            <div className="flex gap-2 mb-2">
+              {([['existing', 'Існуючий'], ['new', 'Новий']] as const).map(([val, lbl]) => (
+                <button key={val} onClick={() => setMode(val)}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium"
+                  style={mode === val
+                    ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                    : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {mode === 'existing' ? (
+              <div>
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Пошук клієнта…"
+                  className="w-full px-3 py-2 rounded-xl outline-none text-sm mb-2" style={inputStyle} />
+                <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                  {filteredClients.length === 0 && (
+                    <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Нікого не знайдено.</p>
+                  )}
+                  {filteredClients.map(c => (
+                    <button key={c.id} onClick={() => setClientId(c.id)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl text-left"
+                      style={{ background: 'var(--tg-theme-secondary-bg-color)',
+                        border: clientId === c.id ? '1.5px solid var(--tg-theme-button-color)' : '1.5px solid transparent' }}>
+                      <span className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>{c.fullName}</span>
+                      {c.phone && <span className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{c.phone}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Імʼя клієнта"
+                  className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
+                <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Телефон (необовʼязково)"
+                  type="tel" inputMode="tel"
+                  className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 pt-2 flex-shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+          <button onClick={submit} disabled={!canSave || submitting}
+            className="w-full py-4 rounded-2xl font-semibold text-base transition-opacity disabled:opacity-40"
+            style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
+            {submitting ? 'Створюємо…' : 'Записати'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

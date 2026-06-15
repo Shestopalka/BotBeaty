@@ -36,6 +36,8 @@ export const appointmentsApi = {
   updateStatus: (id: string, masterId: string, status: string) =>
     api.patch(`/appointments/${id}/status`, { masterId, status }).then(r => r.data),
   create: (data: any) => api.post('/appointments', data).then(r => r.data),
+  // Майстер записує клієнта сам (телефонний/офлайн запис).
+  createByMaster: (data: any) => api.post('/appointments/by-master', data).then(r => r.data),
 };
 
 // ─── Slots ────────────────────────────────────────────────────────────────────

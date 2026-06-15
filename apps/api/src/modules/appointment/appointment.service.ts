@@ -26,6 +26,15 @@ export interface CreateAppointmentDto {
   clientPhone?: string;
 }
 
+export interface CreateByMasterDto {
+  masterId: string;
+  serviceId: string;
+  slotId: string;
+  clientId?: string;     // існуючий клієнт
+  clientName?: string;   // або новий офлайн-клієнт
+  clientPhone?: string;
+}
+
 @Injectable()
 export class AppointmentService {
   constructor(
@@ -205,6 +214,109 @@ export class AppointmentService {
         masterId: dto.masterId,
         clientTelegramId: dto.clientTelegramId,
       });
+
+      return saved;
+    });
+  }
+
+  /**
+   * Запис, який створює САМ МАЙСТЕР (напр. клієнт зателефонував).
+   * Одразу підтверджений, ігнорує ліміт записів/пейвол. Клієнт може бути
+   * існуючий (clientId) або новий офлайн (clientName + clientPhone, без Telegram).
+   */
+  async createByMaster(dto: CreateByMasterDto): Promise<Appointment> {
+    return await this.dataSource.transaction(async (manager) => {
+      const slot = await manager
+        .getRepository(Slot)
+        .createQueryBuilder('slot')
+        .setLock('pessimistic_write')
+        .where('slot.id = :id', { id: dto.slotId })
+        .andWhere('slot.masterId = :masterId', { masterId: dto.masterId })
+        .andWhere('slot.deletedAt IS NULL')
+        .getOne();
+      if (!slot) throw new NotFoundException('Слот не знайдено');
+      if (slot.isBooked) throw new ConflictException('Цей час вже зайнятий');
+
+      const service = await manager.getRepository(Service).findOne({
+        where: { id: dto.serviceId, masterId: dto.masterId, isActive: true },
+      });
+      if (!service) throw new NotFoundException('Послугу не знайдено');
+
+      // Визначаємо клієнта: існуючий за id, або новий офлайн за іменем/телефоном.
+      let client: Client | null = null;
+      if (dto.clientId) {
+        client = await manager.getRepository(Client).findOne({
+          where: { id: dto.clientId, masterId: dto.masterId },
+        });
+        if (!client) throw new NotFoundException('Клієнта не знайдено');
+      } else {
+        const name = dto.clientName?.trim();
+        if (!name) throw new BadRequestException('Вкажіть імʼя клієнта');
+        const phone = dto.clientPhone?.trim() || undefined;
+        // Дедуп: якщо вказано телефон — шукаємо наявну картку з цим номером.
+        if (phone) {
+          client = await manager.getRepository(Client).findOne({
+            where: { masterId: dto.masterId, phone },
+          });
+        }
+        if (!client) {
+          client = manager.getRepository(Client).create({
+            masterId: dto.masterId,
+            fullName: name,
+            phone,
+            telegramId: null,
+            tag: ClientTag.NEW,
+          });
+          await manager.getRepository(Client).save(client);
+        }
+      }
+
+      if (client.tag === ClientTag.BLOCKED || client.tag === ClientTag.UNWANTED) {
+        throw new BadRequestException('Цей клієнт заблокований');
+      }
+
+      const upd = await manager
+        .getRepository(Slot)
+        .createQueryBuilder()
+        .update()
+        .set({ isBooked: true, version: () => 'version + 1' })
+        .where('id = :id AND version = :version AND isBooked = false', {
+          id: slot.id,
+          version: slot.version,
+        })
+        .execute();
+      if (upd.affected === 0) {
+        throw new ConflictException('Слот щойно зайняли. Оберіть інший час.');
+      }
+
+      const appointment = manager.getRepository(Appointment).create({
+        masterId: dto.masterId,
+        clientId: client.id,
+        serviceId: service.id,
+        slotId: slot.id,
+        pricePaid: service.price,
+        currency: service.currency || 'UAH',
+        status: AppointmentStatus.CONFIRMED, // майстер створює → одразу підтверджено
+      });
+      const saved = await manager.getRepository(Appointment).save(appointment);
+
+      await manager.getRepository(AuditLog).save({
+        tableName: 'appointments',
+        recordId: saved.id,
+        action: AuditAction.INSERT,
+        newData: { ...saved },
+        changedBy: dto.masterId,
+        changedByType: 'master',
+      });
+
+      // Сповіщаємо клієнта лише якщо в нього є Telegram.
+      if (client.telegramId) {
+        await this.notificationsQueue.add('appointment_status_changed', {
+          appointmentId: saved.id,
+          oldStatus: AppointmentStatus.PENDING,
+          newStatus: AppointmentStatus.CONFIRMED,
+        });
+      }
 
       return saved;
     });
