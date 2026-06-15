@@ -242,6 +242,12 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
             style={{ background: 'rgba(239,159,39,0.12)', color: '#c07010' }}>
             <UserX size={16} />
           </button>
+          <button onClick={onCancel}
+            className="w-11 flex items-center justify-center rounded-xl"
+            title="Скасувати запис"
+            style={{ background: 'rgba(224,92,92,0.1)', color: '#c04040' }}>
+            <X size={16} />
+          </button>
         </div>
       )}
     </div>

@@ -298,8 +298,11 @@ export class AppointmentService {
         const hoursLeft =
           (new Date(appointment.slot.startAt).getTime() - Date.now()) / 3_600_000;
         if (hoursLeft < ch) {
+          const left = hoursLeft <= 0
+            ? 'запис уже почався'
+            : `лишилось ~${Math.round(hoursLeft)} год`;
           throw new BadRequestException(
-            `Скасувати можна не пізніше ніж за ${ch} год до запису. Звʼяжіться з майстром.`,
+            `Скасувати можна не пізніше ніж за ${ch} год до запису (${left}). Звʼяжіться з майстром.`,
           );
         }
       }

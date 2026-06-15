@@ -275,6 +275,16 @@ export class BotService implements OnModuleInit {
       });
     });
 
+    // ─── Текстові кнопки постійної клавіатури клієнта ────────────────────
+    bot.hears('📋 Мої записи', async (ctx) => {
+      if (String(ctx.from.id) === master.telegramId) return;
+      await this.clientBotHandler.handleMyAppointments(ctx, master);
+    });
+    bot.hears('💬 Написати майстру', async (ctx) => {
+      if (String(ctx.from.id) === master.telegramId) return;
+      await this.clientBotHandler.handleContactMaster(ctx, master);
+    });
+
     // ─── Callback кнопки підтвердження/скасування ─────────────────────
     bot.on('callback_query', async (ctx) => {
       const data: string = (ctx.callbackQuery as any)?.data ?? '';

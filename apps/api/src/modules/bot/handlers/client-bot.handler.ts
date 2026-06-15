@@ -63,25 +63,34 @@ export class ClientBotHandler {
       `\nОберіть дію 👇`,
       {
         parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{
-              text: '📅 Записатись онлайн',
-              web_app: { url: `${miniAppUrl}/book/${master.id}` },
-            }],
-            [{ text: '📋 Мої записи', callback_data: 'my_appointments' }],
-            [{ text: '💬 Написати майстру', callback_data: 'contact_master' }],
-          ],
-        },
+        // Постійна клавіатура: завжди під рукою, не треба щоразу писати /start.
+        reply_markup: this.mainMenuKeyboard(master),
       },
     );
+  }
+
+  /**
+   * Постійна нижня клавіатура клієнта (always-on). Кнопка «Записатись» —
+   * web_app, тож відкриває Mini App прямо звідси; решта — текстові команди.
+   */
+  mainMenuKeyboard(master: Master) {
+    const miniAppUrl = this.configService.get<string>('miniApp.url');
+    return {
+      keyboard: [
+        [{ text: '📅 Записатись онлайн', web_app: { url: `${miniAppUrl}/book/${master.id}` } }],
+        [{ text: '📋 Мої записи' }, { text: '💬 Написати майстру' }],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+    };
   }
 
   /**
    * Клієнт натискає "Мої записи"
    */
   async handleMyAppointments(ctx: any, master: Master) {
-    await ctx.answerCbQuery();
+    // Може викликатись як з inline-кнопки (callback), так і з текстової кнопки.
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     const telegramId = String(ctx.from.id);
 
     const client = await this.clientRepo.findOne({
@@ -165,7 +174,7 @@ export class ClientBotHandler {
    * Клієнт натискає "Написати майстру"
    */
   async handleContactMaster(ctx: any, master: Master) {
-    await ctx.answerCbQuery();
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     await ctx.reply(
       `💬 Написати майстру ${master.fullName}:\n` +
       (master.username ? `@${master.username}` : 'Використайте кнопку нижче'),
