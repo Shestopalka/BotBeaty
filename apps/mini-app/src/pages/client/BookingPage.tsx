@@ -7,14 +7,19 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { applyTheme, THEMES, ThemeName } from '../../themes';
 import { Illustration } from '../../components/Illustration';
 import { MapPin, Scissors, Clock, Check } from 'lucide-react';
+import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
 
 type Step = 'intro' | 'service' | 'slot' | 'confirm' | 'success' | 'cancelled';
 
-interface Service { id: string; name: string; durationMinutes: number; price: number; currency: string; }
+interface Service {
+  id: string; name: string; durationMinutes: number;
+  priceType?: PriceType; price: number; priceMax?: number | null; currency: string;
+}
 interface Slot { id: string; startAt: string; endAt: string; }
 interface Master {
   id: string; fullName: string; specialties: string[]; services: Service[];
   theme?: string; city?: string; bio?: string; avatarUrl?: string; accentColor?: string | null;
+  cancellationHours?: number;
 }
 
 const SPECIALTY_LABELS: Record<string, string> = {
@@ -38,6 +43,7 @@ export default function BookingPage() {
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [phone, setPhone] = useState('');
+  const [nextSlot, setNextSlot] = useState<string | null | undefined>(undefined);
 
   // Валідний український номер: 10–13 цифр (можна з +).
   const phoneDigits = phone.replace(/\D/g, '');
@@ -76,6 +82,14 @@ export default function BookingPage() {
   useEffect(() => {
     if (step === 'slot') loadSlots();
   }, [step, selectedDate]);
+
+  // Найближчий вільний слот — для вітального екрана.
+  useEffect(() => {
+    if (!masterId) return;
+    slotsApi.getNextAvailable(masterId)
+      .then((s) => setNextSlot(s?.startAt ?? null))
+      .catch(() => setNextSlot(null));
+  }, [masterId]);
 
   // Telegram тримає webview «живим»: при повторному відкритті стейт (зокрема
   // вибрана дата) лишається з минулого сеансу. Якщо обрана дата вже в минулому —
@@ -182,14 +196,29 @@ export default function BookingPage() {
     );
   }
 
-  // ─── Вітальний екран клієнта (профіль майстра + як це працює) ──────────────
+  // ─── Вітальний екран клієнта (профіль + послуги + як це працює) ────────────
   if (step === 'intro') {
     const specs = (master.specialties ?? []).map(s => SPECIALTY_LABELS[s] ?? s);
+    const activeServices = (master.services ?? []).filter(s => (s as any).isActive !== false);
+    const previewServices = activeServices.slice(0, 4);
+
+    // Підпис «найближче вільне»: undefined=завантаження, null=немає, string=є.
+    let nextLabel = '—';
+    if (nextSlot === undefined) nextLabel = '…';
+    else if (nextSlot) {
+      const d = new Date(nextSlot);
+      nextLabel = isSameDay(d, new Date())
+        ? `сьогодні ${format(d, 'HH:mm')}`
+        : format(d, 'd MMM', { locale: uk });
+    } else nextLabel = 'запит';
+
+    const ch = master.cancellationHours ?? 0;
+
     return (
       <div className="flex flex-col min-h-screen px-5 pt-12 pb-8 bb-page"
         style={{ background: 'var(--tg-theme-bg-color)' }}>
         {/* Профіль майстра */}
-        <div className="flex flex-col items-center text-center mb-8">
+        <div className="flex flex-col items-center text-center mb-5">
           {master.avatarUrl ? (
             <img src={master.avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover mb-4" />
           ) : (
@@ -221,6 +250,45 @@ export default function BookingPage() {
           )}
         </div>
 
+        {/* Стат-рядок */}
+        <div className="flex gap-2 mb-4">
+          <div className="flex-1 rounded-2xl py-2.5 text-center" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            <p className="font-bold text-base" style={{ color: 'var(--tg-theme-text-color)' }}>{activeServices.length}</p>
+            <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>послуг</p>
+          </div>
+          <div className="flex-1 rounded-2xl py-2.5 text-center" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            <p className="font-bold text-base" style={{ color: 'var(--tg-theme-text-color)' }}>{nextLabel}</p>
+            <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>найближче</p>
+          </div>
+          {ch > 0 && (
+            <div className="flex-1 rounded-2xl py-2.5 text-center" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+              <p className="font-bold text-base" style={{ color: 'var(--tg-theme-text-color)' }}>{ch} год</p>
+              <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>скасування</p>
+            </div>
+          )}
+        </div>
+
+        {/* Прев'ю послуг */}
+        {previewServices.length > 0 && (
+          <div className="rounded-2xl p-4 mb-4" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>Послуги</p>
+              <button onClick={() => { tg?.HapticFeedback?.impactOccurred?.('light'); setStep('service'); }}
+                className="text-xs font-medium" style={{ color: 'var(--tg-theme-button-color)' }}>
+                {activeServices.length > previewServices.length ? `усі ${activeServices.length} →` : 'усі →'}
+              </button>
+            </div>
+            {previewServices.map((s, i) => (
+              <div key={s.id}
+                className="flex items-center justify-between py-2"
+                style={i < previewServices.length - 1 ? { borderBottom: '0.5px solid var(--theme-glow-color, rgba(0,0,0,0.06))' } : undefined}>
+                <span className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>{s.name}</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>{formatPriceShort(s)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Як це працює */}
         <div className="rounded-2xl p-4 space-y-3.5" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
           <p className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>Як це працює</p>
@@ -239,11 +307,11 @@ export default function BookingPage() {
           ))}
         </div>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-h-[16px]" />
 
         <button
           onClick={() => { tg?.HapticFeedback?.impactOccurred?.('light'); setStep('service'); }}
-          className="w-full mt-8 py-4 rounded-2xl font-semibold text-base"
+          className="w-full mt-6 py-4 rounded-2xl font-semibold text-base"
           style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
           Записатись онлайн
         </button>
@@ -288,7 +356,7 @@ export default function BookingPage() {
                 </p>
               </div>
               <span className="font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
-                {s.price} {s.currency || 'UAH'}
+                {formatPrice(s)}
               </span>
             </button>
           ))}
@@ -372,7 +440,7 @@ export default function BookingPage() {
             <Row label="Час" value={format(new Date(selectedSlot.startAt), 'HH:mm')} />
             <Row label="Тривалість" value={`${selectedService.durationMinutes} хв`} />
             <div className="border-t pt-3" style={{ borderColor: 'var(--tg-theme-hint-color)' }}>
-              <Row label="До сплати" value={`${selectedService.price} ${selectedService.currency || 'UAH'}`} bold />
+              <Row label="Вартість" value={formatPrice(selectedService)} bold />
             </div>
           </div>
 
@@ -432,7 +500,7 @@ export default function BookingPage() {
             <Row label="Дата" value={format(new Date(selectedSlot.startAt), 'd MMMM yyyy', { locale: uk })} />
             <Row label="Час" value={format(new Date(selectedSlot.startAt), 'HH:mm')} />
             <div className="border-t pt-2.5" style={{ borderColor: 'var(--tg-theme-hint-color)22' }}>
-              <Row label="Сума" value={`${selectedService.price} ${selectedService.currency || 'UAH'}`} bold />
+              <Row label="Вартість" value={formatPrice(selectedService)} bold />
             </div>
           </div>
 

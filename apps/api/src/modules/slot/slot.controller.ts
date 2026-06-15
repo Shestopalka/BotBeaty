@@ -16,6 +16,13 @@ export class SlotController {
     return this.slotService.createBulk({ ...dto, masterId });
   }
 
+  // Публічний: найближчий вільний слот майстра (для вітального екрана).
+  @Public()
+  @Get('available/:masterId/next')
+  getNextAvailable(@Param('masterId') masterId: string) {
+    return this.slotService.getNextAvailable(masterId);
+  }
+
   // Публічний: клієнт переглядає ВІЛЬНІ слоти конкретного майстра за його id.
   @Public()
   @Get('available/:masterId')

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, IsNull } from 'typeorm';
+import { Repository, Between, IsNull, MoreThanOrEqual } from 'typeorm';
 import { Slot } from '../../database/entities/slot.entity';
 
 const SLOT_TIMEZONE = 'Europe/Kyiv';
@@ -126,6 +126,22 @@ export class SlotService {
         isBooked: false,
         startAt: Between(effectiveFrom, to),
         deletedAt: IsNull(),
+      },
+      order: { startAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Найближчий вільний слот майстра у майбутньому (або null).
+   * Для вітального екрана клієнта — показати «найближче вільне».
+   */
+  async getNextAvailable(masterId: string): Promise<Slot | null> {
+    return this.slotRepo.findOne({
+      where: {
+        masterId,
+        isBooked: false,
+        deletedAt: IsNull(),
+        startAt: MoreThanOrEqual(new Date()),
       },
       order: { startAt: 'ASC' },
     });

@@ -5,6 +5,7 @@ import { Check, X, Clock, Calendar, UserX } from 'lucide-react';
 import { appointmentsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
+import { formatPrice, PriceType } from '../../lib/price';
 
 interface Appointment {
   id: string;
@@ -12,7 +13,7 @@ interface Appointment {
   pricePaid: number;
   currency: string;
   client: { fullName: string; tag: string } | null;
-  service: { name: string; durationMinutes: number } | null;
+  service: { name: string; durationMinutes: number; priceType?: PriceType; price?: number; priceMax?: number | null } | null;
   slot: { startAt: string; endAt: string } | null;
 }
 
@@ -171,7 +172,9 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
           {apt.service?.name ?? '—'} · {apt.service?.durationMinutes ?? '?'} хв
         </span>
         <span className="font-bold text-sm" style={{ color: 'var(--tg-theme-button-color)' }}>
-          {apt.pricePaid} {apt.currency}
+          {apt.service?.priceType === 'range'
+            ? formatPrice({ ...apt.service, price: apt.service.price ?? apt.pricePaid, currency: apt.currency })
+            : formatPrice({ price: apt.pricePaid, currency: apt.currency })}
         </span>
       </div>
 

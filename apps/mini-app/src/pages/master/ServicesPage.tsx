@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUI } from '../../context/UIContext';
-import { Plus, Pencil, Trash2, Clock, Scissors } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import api from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
+import { formatPrice, PriceType } from '../../lib/price';
 
 interface Service {
   id: string;
   name: string;
   description?: string;
   durationMinutes: number;
+  priceType?: PriceType;
   price: number;
+  priceMax?: number | null;
   currency: string;
   isActive: boolean;
 }
@@ -118,7 +121,7 @@ export default function ServicesPage() {
                       <Clock size={14} /> {s.durationMinutes} хв
                     </span>
                     <span className="flex items-center gap-1 text-sm font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
-                      {s.price} {s.currency || 'UAH'}
+                      {formatPrice(s)}
                     </span>
                   </div>
                 </div>
@@ -184,16 +187,31 @@ function ServiceForm({
   function handleSave() {
     if (closing) return;
     setClosing(true);
-    setTimeout(() => onSave({ id: initial.id, name, description, durationMinutes: duration, price, currency: initial.currency ?? 'UAH', isActive: initial.isActive ?? true }), CLOSE_MS);
+    setTimeout(() => onSave({
+      id: initial.id,
+      name,
+      description,
+      durationMinutes: duration,
+      priceType,
+      price,
+      priceMax: priceType === 'range' ? priceMax : null,
+      currency: initial.currency ?? 'UAH',
+      isActive: initial.isActive ?? true,
+    }), CLOSE_MS);
   }
 
   const [name, setName] = useState(initial.name ?? '');
   const [description, setDescription] = useState(initial.description ?? '');
   const [durationStr, setDurationStr] = useState(String(initial.durationMinutes ?? 60));
+  const [priceType, setPriceType] = useState<PriceType>(initial.priceType ?? 'fixed');
   const [priceStr, setPriceStr] = useState(String(initial.price ?? 0));
+  const [priceMaxStr, setPriceMaxStr] = useState(
+    initial.priceMax != null ? String(initial.priceMax) : '',
+  );
 
   const duration = parseInt(durationStr) || 0;
   const price = parseFloat(priceStr) || 0;
+  const priceMax = parseFloat(priceMaxStr) || 0;
 
   function handleNumericInput(value: string, setter: (v: string) => void, allowDecimal = false) {
     const clean = allowDecimal
@@ -202,10 +220,9 @@ function ServiceForm({
     setter(clean);
   }
 
-
-
   const inputStyle = { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' };
-  const canSave = name.trim().length > 0 && duration > 0;
+  const rangeValid = priceType !== 'range' || priceMax > price;
+  const canSave = name.trim().length > 0 && duration > 0 && rangeValid;
 
 
 
@@ -237,26 +254,65 @@ function ServiceForm({
                 placeholder="Короткий опис..."
                 className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
             </Field>
-            <div className="flex gap-3">
-              <Field label="Тривалість (хв)" className="flex-1">
-                <input
-                  type="text" inputMode="numeric" pattern="[0-9]*"
-                  value={durationStr}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => handleNumericInput(e.target.value, setDurationStr)}
-                  placeholder="60"
-                  className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
-              </Field>
-              <Field label="Ціна (UAH)" className="flex-1">
+            <Field label="Тривалість (хв)">
+              <input
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={durationStr}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => handleNumericInput(e.target.value, setDurationStr)}
+                placeholder="60"
+                className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
+            </Field>
+
+            {/* Тип ціни: фіксована або діапазон «від–до» */}
+            <Field label="Ціна">
+              <div className="flex gap-2 mb-2">
+                {([['fixed', 'Фіксована'], ['range', 'Діапазон']] as const).map(([val, lbl]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setPriceType(val)}
+                    className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={priceType === val
+                      ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                      : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {priceType === 'fixed' ? (
                 <input
                   type="text" inputMode="decimal"
                   value={priceStr}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => handleNumericInput(e.target.value, setPriceStr, true)}
-                  placeholder="0"
+                  placeholder="Ціна, ₴"
                   className="w-full px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
-              </Field>
-            </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" inputMode="decimal"
+                    value={priceStr}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => handleNumericInput(e.target.value, setPriceStr, true)}
+                    placeholder="від"
+                    className="flex-1 px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
+                  <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>–</span>
+                  <input
+                    type="text" inputMode="decimal"
+                    value={priceMaxStr}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => handleNumericInput(e.target.value, setPriceMaxStr, true)}
+                    placeholder="до"
+                    className="flex-1 px-3 py-2 rounded-xl outline-none text-sm" style={inputStyle} />
+                </div>
+              )}
+              {priceType === 'range' && !rangeValid && (
+                <p className="text-xs mt-1" style={{ color: '#e05c5c' }}>
+                  «До» має бути більшим за «від»
+                </p>
+              )}
+            </Field>
           </div>
         </div>
 

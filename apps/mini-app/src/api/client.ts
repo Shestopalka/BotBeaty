@@ -42,6 +42,9 @@ export const appointmentsApi = {
 export const slotsApi = {
   getAvailable: (masterId: string, from: string, to: string) =>
     api.get(`/slots/available/${masterId}`, { params: { from, to } }).then(r => r.data),
+  // Найближчий вільний слот (для вітального екрана). Повертає Slot або null.
+  getNextAvailable: (masterId: string) =>
+    api.get(`/slots/available/${masterId}/next`).then(r => r.data),
   // Усі слоти майстра (вільні + заброньовані) — для сторінки керування слотами
   getForMaster: (masterId: string, from: string, to: string) =>
     api.get(`/slots/master/${masterId}`, { params: { from, to } }).then(r => r.data),

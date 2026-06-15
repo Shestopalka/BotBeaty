@@ -21,6 +21,16 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
+  /** "350 ₴" або "500–1000 ₴" — узгоджено з фронтом. */
+  private formatPrice(apt: Appointment): string {
+    const cur = !apt.currency || apt.currency === 'UAH' ? '₴' : apt.currency;
+    const svc = apt.service;
+    if (svc?.priceType === 'range' && svc.priceMax != null) {
+      return `${Math.round(Number(svc.price))}–${Math.round(Number(svc.priceMax))} ${cur}`;
+    }
+    return `${Math.round(Number(apt.pricePaid))} ${cur}`;
+  }
+
   async process(job: Job) {
     switch (job.name) {
       case 'appointment_created':
@@ -61,7 +71,7 @@ export class NotificationProcessor extends WorkerHost {
         `✅ <b>Запис створено!</b>\n\n` +
         `💅 Послуга: ${apt.service?.name ?? '—'}\n` +
         `📅 Дата: ${slotTime}\n` +
-        `💰 Вартість: ${apt.pricePaid} ${apt.currency}\n\n` +
+        `💰 Вартість: ${this.formatPrice(apt)}\n\n` +
         `⏳ Очікуємо підтвердження майстра`,
         { parse_mode: 'HTML' },
       );
@@ -78,7 +88,7 @@ export class NotificationProcessor extends WorkerHost {
         (apt.client?.phone ? `📞 Телефон: ${apt.client.phone}\n` : '') +
         `💅 Послуга: ${apt.service?.name ?? '—'}\n` +
         `📅 Час: ${slotTime}\n` +
-        `💰 Сума: ${apt.pricePaid} ${apt.currency}`,
+        `💰 Сума: ${this.formatPrice(apt)}`,
         {
           parse_mode: 'HTML',
           reply_markup: {
