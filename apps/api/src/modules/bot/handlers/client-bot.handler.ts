@@ -54,6 +54,9 @@ export class ClientBotHandler {
       .map(s => SPECIALTY_LABELS[s] ?? s)
       .join(' · ');
 
+    // Повідомлення 1: вітання + INLINE web_app-кнопка «Записатись».
+    // Саме inline web_app надійно передає initData у Mini App (на відміну від
+    // web_app у reply-клавіатурі, де на деяких клієнтах initData порожній).
     await ctx.reply(
       `👋 <b>Вітаємо!</b>\n\n` +
       `Ви звернулися до <b>${master.fullName}</b>\n` +
@@ -63,21 +66,32 @@ export class ClientBotHandler {
       `\nОберіть дію 👇`,
       {
         parse_mode: 'HTML',
-        // Постійна клавіатура: завжди під рукою, не треба щоразу писати /start.
-        reply_markup: this.mainMenuKeyboard(master),
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📅 Записатись онлайн', web_app: { url: `${miniAppUrl}/book/${master.id}` } }],
+            [{ text: '📋 Мої записи', callback_data: 'my_appointments' }],
+            [{ text: '💬 Написати майстру', callback_data: 'contact_master' }],
+          ],
+        },
       },
     );
+
+    // Повідомлення 2: постійна нижня клавіатура для швидкого доступу
+    // (текстові кнопки — без web_app, тож проблем з initData немає).
+    await ctx.reply('Меню завжди під рукою 👇', {
+      reply_markup: this.mainMenuKeyboard(),
+    });
   }
 
   /**
-   * Постійна нижня клавіатура клієнта (always-on). Кнопка «Записатись» —
-   * web_app, тож відкриває Mini App прямо звідси; решта — текстові команди.
+   * Постійна нижня клавіатура клієнта (always-on). Лише текстові кнопки —
+   * «Записатись» запускається inline-кнопкою або кнопкою-меню біля поля вводу,
+   * щоб гарантовано передавати initData.
    */
-  mainMenuKeyboard(master: Master) {
-    const miniAppUrl = this.configService.get<string>('miniApp.url');
+  mainMenuKeyboard() {
     return {
       keyboard: [
-        [{ text: '📅 Записатись онлайн', web_app: { url: `${miniAppUrl}/book/${master.id}` } }],
+        [{ text: '📅 Записатись онлайн' }],
         [{ text: '📋 Мої записи' }, { text: '💬 Написати майстру' }],
       ],
       resize_keyboard: true,

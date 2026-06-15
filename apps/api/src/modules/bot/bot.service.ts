@@ -276,6 +276,17 @@ export class BotService implements OnModuleInit {
     });
 
     // ─── Текстові кнопки постійної клавіатури клієнта ────────────────────
+    bot.hears('📅 Записатись онлайн', async (ctx) => {
+      if (String(ctx.from.id) === master.telegramId) return;
+      // Відкриваємо запис inline web_app-кнопкою — надійно передає initData.
+      await ctx.reply('Натисніть, щоб обрати послугу й час 👇', {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '📅 Відкрити запис', web_app: { url: `${miniAppUrl}/book/${master.id}` } },
+          ]],
+        },
+      });
+    });
     bot.hears('📋 Мої записи', async (ctx) => {
       if (String(ctx.from.id) === master.telegramId) return;
       await this.clientBotHandler.handleMyAppointments(ctx, master);

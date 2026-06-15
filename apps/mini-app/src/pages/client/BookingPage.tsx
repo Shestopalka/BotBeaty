@@ -128,6 +128,12 @@ export default function BookingPage() {
 
   async function confirmBooking() {
     if (!selectedSlot || !selectedService) return;
+    // Без initData бекенд не зможе підтвердити особу клієнта. Це буває, коли
+    // сторінку відкрито не через кнопку в боті. Підкажемо, як відкрити правильно.
+    if (!window.Telegram?.WebApp?.initData) {
+      showError(null, 'Щоб записатись, відкрийте бота майстра й натисніть кнопку «Записатись онлайн».');
+      return;
+    }
     // user може бути null у dev режимі — використовуємо fallback
     const clientTelegramId = String(user?.id ?? 0);
     const clientName = user
