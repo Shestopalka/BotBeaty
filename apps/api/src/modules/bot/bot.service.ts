@@ -299,28 +299,34 @@ export class BotService implements OnModuleInit {
     // ─── Callback кнопки підтвердження/скасування ─────────────────────
     bot.on('callback_query', async (ctx) => {
       const data: string = (ctx.callbackQuery as any)?.data ?? '';
-
-      if (data === 'my_appointments') {
-        await this.clientBotHandler.handleMyAppointments(ctx, master);
-        return;
-      }
-      if (data === 'contact_master') {
-        await this.clientBotHandler.handleContactMaster(ctx, master);
-        return;
-      }
-      if (data.startsWith('cancel_my_apt:')) {
-        await this.clientBotHandler.handleCancelMyAppointment(ctx, data.split(':')[1]);
-        return;
-      }
-
-      // Кнопки для майстра (confirm/cancel/complete)
-      if (
-        data.startsWith('confirm_apt:') ||
-        data.startsWith('cancel_apt:') ||
-        data.startsWith('complete_apt:')
-      ) {
-        await this.appointmentCallbackHandler.handle(ctx, master.id);
-        return;
+      try {
+        if (data === 'my_appointments') {
+          await this.clientBotHandler.handleMyAppointments(ctx, master);
+          return;
+        }
+        if (data === 'contact_master') {
+          await this.clientBotHandler.handleContactMaster(ctx, master);
+          return;
+        }
+        if (data.startsWith('cancel_my_apt:')) {
+          await this.clientBotHandler.handleCancelMyAppointment(ctx, data.split(':')[1]);
+          return;
+        }
+        // Кнопки для майстра (confirm/cancel/complete)
+        if (
+          data.startsWith('confirm_apt:') ||
+          data.startsWith('cancel_apt:') ||
+          data.startsWith('complete_apt:')
+        ) {
+          await this.appointmentCallbackHandler.handle(ctx, master.id);
+          return;
+        }
+        // Невідома кнопка — все одно підтверджуємо, щоб не «висіла».
+        await ctx.answerCbQuery().catch(() => {});
+      } catch (e: any) {
+        this.logger.warn(`callback_query помилка (${data}): ${e?.message}`);
+        // Гарантовано знімаємо «спінер» з кнопки навіть при помилці.
+        await ctx.answerCbQuery('Сталася помилка, спробуйте ще раз').catch(() => {});
       }
     });
   }

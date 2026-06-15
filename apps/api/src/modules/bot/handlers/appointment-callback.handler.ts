@@ -31,6 +31,10 @@ export class AppointmentCallbackHandler {
   ) {}
 
   async handle(ctx: any, masterId: string): Promise<void> {
+    // Підтверджуємо callback МИТТЄВО (до будь-яких запитів у БД), щоб кнопка
+    // не «висіла». Callback можна відповісти лише раз — тому далі не викликаємо.
+    await ctx.answerCbQuery().catch(() => {});
+
     const data: string = ctx.callbackQuery?.data ?? '';
 
     if (data.startsWith('confirm_apt:')) {
@@ -43,16 +47,14 @@ export class AppointmentCallbackHandler {
   }
 
   private async handleConfirm(ctx: any, appointmentId: string, masterId: string) {
-    await ctx.answerCbQuery('⏳ Підтверджуємо...');
-
     const apt = await this.appointmentRepo.findOne({
       where: { id: appointmentId, masterId },
       relations: ['client', 'service', 'slot'],
     });
 
-    if (!apt) { await ctx.answerCbQuery('❌ Запис не знайдено'); return; }
+    if (!apt) { await ctx.reply('❌ Запис не знайдено'); return; }
     if (apt.status !== AppointmentStatus.PENDING) {
-      await ctx.answerCbQuery('ℹ️ Статус вже змінено'); return;
+      await ctx.reply('ℹ️ Статус цього запису вже змінено'); return;
     }
 
     await this.updateStatus(apt, AppointmentStatus.CONFIRMED, masterId);
@@ -88,14 +90,12 @@ export class AppointmentCallbackHandler {
   }
 
   private async handleCancel(ctx: any, appointmentId: string, masterId: string) {
-    await ctx.answerCbQuery('⏳ Скасовуємо...');
-
     const apt = await this.appointmentRepo.findOne({
       where: { id: appointmentId, masterId },
       relations: ['client', 'service', 'slot'],
     });
 
-    if (!apt) { await ctx.answerCbQuery('❌ Запис не знайдено'); return; }
+    if (!apt) { await ctx.reply('❌ Запис не знайдено'); return; }
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Appointment).update(appointmentId, {
@@ -134,14 +134,12 @@ export class AppointmentCallbackHandler {
   }
 
   private async handleComplete(ctx: any, appointmentId: string, masterId: string) {
-    await ctx.answerCbQuery('⏳ Завершуємо...');
-
     const apt = await this.appointmentRepo.findOne({
       where: { id: appointmentId, masterId },
       relations: ['client', 'service', 'slot'],
     });
 
-    if (!apt) { await ctx.answerCbQuery('❌ Запис не знайдено'); return; }
+    if (!apt) { await ctx.reply('❌ Запис не знайдено'); return; }
 
     await this.updateStatus(apt, AppointmentStatus.COMPLETED, masterId);
 
