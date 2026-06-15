@@ -101,6 +101,57 @@ export class MasterService {
     return this.sanitize(await this.findEntityById(id));
   }
 
+  // Кеш аватарів у пам'яті: уникаємо зайвих звернень до Telegram на кожен запит.
+  private static avatarCache = new Map<string, { buf: Buffer; type: string; at: number } | null>();
+  private static readonly AVATAR_TTL_MS = 60 * 60 * 1000; // 1 год
+
+  /**
+   * Дістає фото профілю майстра з Telegram (через токен його бота).
+   * Токен лишається на сервері — клієнт отримує лише байти картинки.
+   * Повертає null, якщо фото немає або приховане налаштуваннями приватності.
+   */
+  async getTelegramAvatar(
+    masterId: string,
+  ): Promise<{ buffer: Buffer; contentType: string } | null> {
+    const cached = MasterService.avatarCache.get(masterId);
+    if (cached !== undefined && Date.now() - (cached?.at ?? 0) < MasterService.AVATAR_TTL_MS) {
+      return cached ? { buffer: cached.buf, contentType: cached.type } : null;
+    }
+
+    const master = await this.masterRepo.findOne({ where: { id: masterId } });
+    if (!master?.botToken || !master.telegramId) return null;
+    const token = master.botToken;
+
+    try {
+      const photosRes = await fetch(
+        `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${master.telegramId}&limit=1`,
+      );
+      const photos: any = await photosRes.json();
+      const sizes = photos?.result?.photos?.[0];
+      if (!Array.isArray(sizes) || sizes.length === 0) {
+        MasterService.avatarCache.set(masterId, null);
+        return null;
+      }
+      // Беремо найбільший розмір (останній у масиві).
+      const fileId = sizes[sizes.length - 1].file_id;
+
+      const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+      const fileJson: any = await fileRes.json();
+      const filePath = fileJson?.result?.file_path;
+      if (!filePath) return null;
+
+      const imgRes = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`);
+      if (!imgRes.ok) return null;
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      const type = imgRes.headers.get('content-type') || 'image/jpeg';
+
+      MasterService.avatarCache.set(masterId, { buf, type, at: Date.now() });
+      return { buffer: buf, contentType: type };
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Оновлення власного профілю майстром.
    * Дозволяємо лише безпечний whitelist полів — НІКОЛИ botToken, status,

@@ -6,6 +6,7 @@ import { mastersApi, slotsApi, appointmentsApi } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
 import { applyTheme, THEMES, ThemeName } from '../../themes';
 import { Illustration } from '../../components/Illustration';
+import { Avatar } from '../../components/Avatar';
 import { MapPin, Scissors, Clock, Check } from 'lucide-react';
 import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
 
@@ -214,14 +215,9 @@ export default function BookingPage() {
         style={{ background: 'var(--tg-theme-bg-color)' }}>
         {/* Профіль майстра */}
         <div className="flex flex-col items-center text-center mb-5">
-          {master.avatarUrl ? (
-            <img src={master.avatarUrl} alt="" className="w-24 h-24 rounded-full object-cover mb-4" />
-          ) : (
-            <div className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold mb-4"
-              style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
-              {(master.fullName?.[0] ?? '✦').toUpperCase()}
-            </div>
-          )}
+          <div className="mb-4">
+            <Avatar name={master.fullName} masterId={master.id} avatarUrl={master.avatarUrl} size={96} />
+          </div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
             {master.fullName}
           </h1>

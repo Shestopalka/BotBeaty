@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Patch, Body, Param, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Headers, UnauthorizedException, Res, NotFoundException } from '@nestjs/common';
+import { Response } from 'express';
 import { MasterService, RegisterMasterDto } from './master.service';
 import { TgUser } from '../../common/decorators/tg-user.decorator';
 import { TelegramUser } from '../auth/telegram-auth.service';
@@ -27,6 +28,18 @@ export class MasterController {
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.masterService.findPublicById(id);
+  }
+
+  // Публічний проксі аватара з Telegram. Токен бота лишається на сервері —
+  // клієнт отримує лише байти зображення. 404, якщо фото немає/приховане.
+  @Public()
+  @Get(':id/avatar')
+  async avatar(@Param('id') id: string, @Res() res: Response) {
+    const photo = await this.masterService.getTelegramAvatar(id);
+    if (!photo) throw new NotFoundException('Аватар недоступний');
+    res.setHeader('Content-Type', photo.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(photo.buffer);
   }
 
   // :id ігнорується — майстер може редагувати лише власний профіль,

@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { Calendar, Clock, Users, Scissors, BarChart2, Settings, ChevronRight, Check, Copy } from 'lucide-react';
 import { useMaster } from '../../context/MasterContext';
+import { Avatar } from '../../components/Avatar';
 import { appointmentsApi, analyticsApi, mastersApi, slotsApi } from '../../api/client';
 import { addDays, startOfDay } from 'date-fns';
 
@@ -87,10 +88,7 @@ export default function HomePage() {
     <div className="px-4 pt-6 pb-4 flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-full flex items-center justify-center font-semibold"
-          style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
-          {(master?.fullName?.[0] ?? '✦').toUpperCase()}
-        </div>
+        <Avatar name={master?.fullName} masterId={master?.id} avatarUrl={master?.avatarUrl} size={44} />
         <div className="flex-1 min-w-0">
           <p className="text-base font-bold leading-tight" style={{ color: 'var(--tg-theme-text-color)' }}>
             Вітаю, {firstName}

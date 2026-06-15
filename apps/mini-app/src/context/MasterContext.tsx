@@ -6,6 +6,7 @@ export interface Master {
   id: string;
   fullName: string;
   botUsername?: string;
+  avatarUrl?: string | null;
   specialties: string[];
   theme: string;
   status: string;
