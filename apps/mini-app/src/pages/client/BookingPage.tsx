@@ -131,7 +131,11 @@ export default function BookingPage() {
     // Без initData бекенд не зможе підтвердити особу клієнта. Це буває, коли
     // сторінку відкрито не через кнопку в боті. Підкажемо, як відкрити правильно.
     if (!window.Telegram?.WebApp?.initData) {
-      showError(null, 'Щоб записатись, відкрийте бота майстра й натисніть кнопку «Записатись онлайн».');
+      const w: any = window.Telegram?.WebApp;
+      const diag = w
+        ? `platform=${w.platform}, v=${w.version}, unsafeUser=${!!w.initDataUnsafe?.user}`
+        : 'Telegram WebApp недоступний';
+      showError(null, `Щоб записатись, відкрийте бота й натисніть «Записатись онлайн» (нове повідомлення /start), або кнопку-меню біля поля вводу.\n\n[debug: ${diag}]`);
       return;
     }
     // user може бути null у dev режимі — використовуємо fallback
