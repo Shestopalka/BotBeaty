@@ -133,3 +133,18 @@ body {
 .bb-backdrop-out {
   animation: bb-fade-out 0.28s ease forwards;
 }
+
+/* Поява нового запису в розкладі (real-time полінг) */
+@keyframes bb-new-card {
+  0%   { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  60%  { transform: translateY(0)    scale(1);    opacity: 1; }
+  100% { box-shadow: 0 0 0 0 var(--theme-glow-color); }
+}
+@keyframes bb-new-ring {
+  0%   { box-shadow: 0 0 0 0 var(--tg-theme-button-color); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+.bb-new-card {
+  animation: bb-new-card 0.45s cubic-bezier(0.32, 0.72, 0, 1) both,
+             bb-new-ring 1.6s ease-out 0.3s both;
+}

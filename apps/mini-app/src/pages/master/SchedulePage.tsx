@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus } from 'lucide-react';
@@ -40,8 +40,26 @@ export default function SchedulePage() {
   const masterId = master?.id ?? '';
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 380);
   const [showBook, setShowBook] = useState(false);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const seenIds = useRef<Set<string>>(new Set());
 
-  useEffect(() => { if (masterId) loadAppointments(); }, [selectedDate, masterId]);
+  // Зміна дати / майстра — завантажуємо без діфу (нічого не анімуємо).
+  useEffect(() => {
+    if (!masterId) return;
+    seenIds.current = new Set();
+    setNewIds(new Set());
+    loadAppointments(false);
+  }, [selectedDate, masterId]);
+
+  // Розумний полінг: тихо оновлюємо розклад, поки сторінка відкрита й активна.
+  // Нові записи зʼявляються самі (без перезавантаження) + підсвічуються.
+  useEffect(() => {
+    if (!masterId) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadAppointments(true);
+    }, 12000);
+    return () => clearInterval(id);
+  }, [masterId, selectedDate]);
 
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
@@ -49,20 +67,30 @@ export default function SchedulePage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  async function loadAppointments() {
-    setLoading(true);
+  async function loadAppointments(diff: boolean) {
+    if (!diff) setLoading(true);
     try {
       const data = await appointmentsApi.getByMaster(masterId, format(selectedDate, 'yyyy-MM-dd'));
+      if (diff) {
+        // Які записи зʼявились від попереднього разу — їх анімуємо.
+        const fresh = data.filter((a: Appointment) => !seenIds.current.has(a.id)).map((a: Appointment) => a.id);
+        if (fresh.length) {
+          setNewIds(new Set(fresh));
+          window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+          setTimeout(() => setNewIds(new Set()), 2500);
+        }
+      }
+      data.forEach((a: Appointment) => seenIds.current.add(a.id));
       setAppointments(data);
-    } catch { setAppointments([]); }
-    finally { setLoading(false); }
+    } catch { if (!diff) setAppointments([]); }
+    finally { if (!diff) setLoading(false); }
   }
 
   async function updateStatus(id: string, status: string) {
     try {
       await appointmentsApi.updateStatus(id, masterId, status);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
-      loadAppointments();
+      loadAppointments(false);
     } catch (e) { showApiError(e, 'Не вдалось оновити запис.'); }
   }
 
@@ -130,7 +158,7 @@ export default function SchedulePage() {
           </div>
         ) : (
           todayAppointments.map(apt => (
-            <AppointmentCard key={apt.id} apt={apt}
+            <AppointmentCard key={apt.id} apt={apt} isNew={newIds.has(apt.id)}
               onConfirm={() => updateStatus(apt.id, 'confirmed')}
               onCancel={() => updateStatus(apt.id, 'cancelled_master')}
               onComplete={() => updateStatus(apt.id, 'completed')}
@@ -145,15 +173,15 @@ export default function SchedulePage() {
           masterId={masterId}
           initialDate={selectedDate}
           onClose={() => setShowBook(false)}
-          onCreated={(d) => { setShowBook(false); setSelectedDate(startOfDay(d)); loadAppointments(); }}
+          onCreated={(d) => { setShowBook(false); setSelectedDate(startOfDay(d)); loadAppointments(false); }}
         />
       )}
     </div>
   );
 }
 
-function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
-  apt: Appointment; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
+function AppointmentCard({ apt, isNew, onConfirm, onCancel, onComplete, onNoShow }: {
+  apt: Appointment; isNew?: boolean; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
 }) {
   const startTime = format(new Date(apt.slot?.startAt ?? Date.now()), 'HH:mm');
   const endTime = format(new Date(apt.slot?.endAt ?? Date.now()), 'HH:mm');
@@ -171,7 +199,7 @@ function AppointmentCard({ apt, onConfirm, onCancel, onComplete, onNoShow }: {
   }
 
   return (
-    <div className="rounded-2xl p-4 space-y-3" style={{
+    <div className={`rounded-2xl p-4 space-y-3 ${isNew ? 'bb-new-card' : ''}`} style={{
       background: 'var(--tg-theme-secondary-bg-color)',
       boxShadow: 'var(--theme-shadow)',
     }}>
