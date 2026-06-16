@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { mastersApi, slotsApi, appointmentsApi } from '../../api/client';
+import { mastersApi, slotsApi, appointmentsApi, getInitData } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
 import { applyTheme, THEMES, ThemeName } from '../../themes';
 import { Illustration } from '../../components/Illustration';
@@ -130,10 +130,10 @@ export default function BookingPage() {
     if (!selectedSlot || !selectedService) return;
     // Без initData бекенд не зможе підтвердити особу клієнта. Це буває, коли
     // сторінку відкрито не через кнопку в боті. Підкажемо, як відкрити правильно.
-    if (!window.Telegram?.WebApp?.initData) {
+    if (!getInitData()) {
       const w: any = window.Telegram?.WebApp;
       const diag = w
-        ? `platform=${w.platform}, v=${w.version}, unsafeUser=${!!w.initDataUnsafe?.user}`
+        ? `platform=${w.platform}, v=${w.version}, unsafeUser=${!!w.initDataUnsafe?.user}, hasHash=${window.location.hash.includes('tgWebAppData')}`
         : 'Telegram WebApp недоступний';
       showError(null, `Щоб записатись, відкрийте бота й натисніть «Записатись онлайн» (нове повідомлення /start), або кнопку-меню біля поля вводу.\n\n[debug: ${diag}]`);
       return;

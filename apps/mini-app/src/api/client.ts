@@ -4,9 +4,27 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api/v1',
 });
 
+/**
+ * Отримати Telegram initData максимально надійно:
+ * 1) з WebApp.initData (основне джерело);
+ * 2) фолбек — з launch-хешу URL (#tgWebAppData=...), який Telegram додає при
+ *    відкритті Mini App. Рятує, якщо SDK не встиг ініціалізуватись або
+ *    window.Telegram недоступний.
+ */
+export function getInitData(): string {
+  const fromSdk = window.Telegram?.WebApp?.initData;
+  if (fromSdk) return fromSdk;
+  try {
+    const hash = window.location.hash.replace(/^#/, '');
+    const fromHash = new URLSearchParams(hash).get('tgWebAppData');
+    if (fromHash) return fromHash;
+  } catch { /* ignore */ }
+  return '';
+}
+
 // Передаємо Telegram initData в кожен запит для автентифікації
 api.interceptors.request.use((config) => {
-  const initData = window.Telegram?.WebApp?.initData;
+  const initData = getInitData();
   if (initData) {
     config.headers['X-Telegram-Init-Data'] = initData;
   }
