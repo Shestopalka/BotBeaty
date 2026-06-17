@@ -63,4 +63,17 @@ export class MasterController {
     }
     return this.masterService.activateSubscription(id, { months: body?.months, plan: body?.plan });
   }
+
+  // ПОВНЕ безповоротне видалення майстра і всіх його даних. Захищено адмін-секретом.
+  @Public()
+  @Post(':id/delete-account')
+  deleteAccount(
+    @Param('id') id: string,
+    @Headers('x-admin-secret') secret: string,
+  ) {
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+      throw new UnauthorizedException('Невалідний адмін-секрет');
+    }
+    return this.masterService.deleteMaster(id);
+  }
 }

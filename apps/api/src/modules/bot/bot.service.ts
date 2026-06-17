@@ -376,6 +376,15 @@ export class BotService implements OnModuleInit {
     else this.logger.warn(`Бот майстра ${masterId} не знайдено`);
   }
 
+  /** Зупиняє й «забуває» бота майстра (при видаленні акаунта). */
+  async stopMasterBot(masterId: string): Promise<void> {
+    const bot = this.masterBots.get(masterId);
+    if (!bot) return;
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+    try { bot.stop(); } catch { /* already stopped */ }
+    this.masterBots.delete(masterId);
+  }
+
   // ─── Надсилання повідомлень ───────────────────────────────────────────────
 
   async sendToClient(masterId: string, telegramId: string, message: string, extra?: any) {

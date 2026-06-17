@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Master, MasterStatus, BeautySpecialty, SubscriptionStatus } from '../../database/entities/master.entity';
+import { Appointment } from '../../database/entities/appointment.entity';
+import { Slot } from '../../database/entities/slot.entity';
+import { Service } from '../../database/entities/service.entity';
+import { Client } from '../../database/entities/client.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { BotService } from '../bot/bot.service';
 
@@ -99,6 +104,42 @@ export class MasterService {
   /** Публічний профіль для клієнта — без чутливих полів. */
   async findPublicById(id: string): Promise<Partial<Master>> {
     return this.sanitize(await this.findEntityById(id));
+  }
+
+  /**
+   * ПОВНЕ видалення майстра і всіх його даних (безповоротно).
+   * Порядок важливий через зовнішні ключі: записи → слоти/послуги/клієнти → майстер.
+   * Наприкінці зупиняємо й «забуваємо» бота майстра.
+   */
+  async deleteMaster(masterId: string): Promise<{ deleted: true }> {
+    const master = await this.masterRepo.findOne({ where: { id: masterId } });
+    if (!master) throw new NotFoundException('Майстра не знайдено');
+
+    await this.dataSource.transaction(async (manager) => {
+      const appts = await manager.getRepository(Appointment).find({
+        where: { masterId },
+        select: ['id'],
+        withDeleted: true,
+      });
+      const apptIds = appts.map((a) => a.id);
+
+      // Аудит-лог (без FK, але прибираємо сміття): по записах майстра і по його діях.
+      if (apptIds.length) {
+        await manager.getRepository(AuditLog).delete({ recordId: In(apptIds) });
+      }
+      await manager.getRepository(AuditLog).delete({ changedBy: masterId });
+
+      // Hard-delete у правильному порядку (bypass soft-delete).
+      await manager.getRepository(Appointment).delete({ masterId });
+      await manager.getRepository(Slot).delete({ masterId });
+      await manager.getRepository(Service).delete({ masterId });
+      await manager.getRepository(Client).delete({ masterId });
+      await manager.getRepository(Master).delete({ id: masterId });
+    });
+
+    // Зупиняємо бота поза транзакцією (мережева дія).
+    await this.botService.stopMasterBot(masterId).catch(() => {});
+    return { deleted: true };
   }
 
   // Кеш аватарів у пам'яті: уникаємо зайвих звернень до Telegram на кожен запит.
