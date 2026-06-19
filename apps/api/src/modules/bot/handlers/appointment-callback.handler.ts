@@ -59,19 +59,11 @@ export class AppointmentCallbackHandler {
 
     await this.updateStatus(apt, AppointmentStatus.CONFIRMED, masterId);
 
-    // Нотифікуємо клієнта про підтвердження (раніше тут цього не було —
-    // тому клієнту не приходило "Ваш запис підтверджено").
-    await this.notificationsQueue.add('appointment_status_changed', {
-      appointmentId: apt.id,
-      oldStatus: AppointmentStatus.PENDING,
-      newStatus: AppointmentStatus.CONFIRMED,
-    }).catch(e => this.logger.warn(`Не вдалось поставити нотифікацію підтвердження: ${e.message}`));
-
     const time = new Date(apt.slot.startAt).toLocaleString('uk-UA', {
       timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
     });
 
-    // Оновлюємо повідомлення — прибираємо кнопки, показуємо статус
+    // Одразу оновлюємо повідомлення — це видима реакція для майстра.
     await ctx.editMessageText(
       `✅ <b>Запис підтверджено</b>\n\n` +
       `👤 ${apt.client.fullName}\n` +
@@ -87,6 +79,14 @@ export class AppointmentCallbackHandler {
         },
       },
     );
+
+    // Нотифікацію клієнту ставимо в чергу БЕЗ очікування — не блокуємо кнопку
+    // на час звернення до Redis.
+    void this.notificationsQueue.add('appointment_status_changed', {
+      appointmentId: apt.id,
+      oldStatus: AppointmentStatus.PENDING,
+      newStatus: AppointmentStatus.CONFIRMED,
+    }).catch(e => this.logger.warn(`Нотифікація підтвердження: ${e.message}`));
   }
 
   private async handleCancel(ctx: any, appointmentId: string, masterId: string) {
@@ -117,13 +117,6 @@ export class AppointmentCallbackHandler {
       timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
     });
 
-    // Нотифікуємо клієнта про скасування
-    await this.notificationsQueue.add('appointment_status_changed', {
-      appointmentId,
-      oldStatus: apt.status,
-      newStatus: 'cancelled_master',
-    }).catch(e => this.logger.warn(`Не вдалось поставити нотифікацію: ${e.message}`));
-
     await ctx.editMessageText(
       `❌ <b>Запис скасовано</b>\n\n` +
       `👤 ${apt.client.fullName}\n` +
@@ -131,6 +124,12 @@ export class AppointmentCallbackHandler {
       `📅 ${time}`,
       { parse_mode: 'HTML' },
     );
+
+    void this.notificationsQueue.add('appointment_status_changed', {
+      appointmentId,
+      oldStatus: apt.status,
+      newStatus: 'cancelled_master',
+    }).catch(e => this.logger.warn(`Нотифікація скасування: ${e.message}`));
   }
 
   private async handleComplete(ctx: any, appointmentId: string, masterId: string) {
@@ -143,13 +142,6 @@ export class AppointmentCallbackHandler {
 
     await this.updateStatus(apt, AppointmentStatus.COMPLETED, masterId);
 
-    // Нотифікуємо клієнта про завершення
-    await this.notificationsQueue.add('appointment_status_changed', {
-      appointmentId,
-      oldStatus: apt.status,
-      newStatus: 'completed',
-    }).catch(e => this.logger.warn(`Не вдалось поставити нотифікацію: ${e.message}`));
-
     await ctx.editMessageText(
       `🌟 <b>Візит завершено!</b>\n\n` +
       `👤 ${apt.client.fullName}\n` +
@@ -157,6 +149,12 @@ export class AppointmentCallbackHandler {
       `💰 ${apt.pricePaid} ${apt.currency}`,
       { parse_mode: 'HTML' },
     );
+
+    void this.notificationsQueue.add('appointment_status_changed', {
+      appointmentId,
+      oldStatus: apt.status,
+      newStatus: 'completed',
+    }).catch(e => this.logger.warn(`Нотифікація завершення: ${e.message}`));
   }
 
   private async updateStatus(apt: Appointment, status: AppointmentStatus, masterId: string) {
