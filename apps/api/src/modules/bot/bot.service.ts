@@ -336,6 +336,21 @@ export class BotService implements OnModuleInit {
   private async sendMasterMenu(ctx: any, master: Master) {
     const miniAppUrl = this.configService.get<string>('miniApp.url');
 
+    // Самовідновлення: щоразу при /start чи /menu перезаписуємо кнопку-меню
+    // цього чату на актуальний URL. Якщо вона колись «застрягла» на старому
+    // домені (напр. ngrok) — майстру достатньо написати /start.
+    const chatId = ctx.chat?.id;
+    if (chatId) {
+      await ctx.telegram.setChatMenuButton({
+        chatId,
+        menuButton: {
+          type: 'web_app',
+          text: '📅 Мій кабінет',
+          web_app: { url: `${miniAppUrl}/master/home` },
+        },
+      }).catch((e: any) => this.logger.warn(`setChatMenuButton (master /start) failed: ${e?.message}`));
+    }
+
     await ctx.reply(
       `👋 <b>${master.fullName}</b>, вітаємо!\n\nОберіть розділ:`,
       {
