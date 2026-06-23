@@ -18,6 +18,16 @@ const WORK_TIMES = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:
 const DURATIONS = [30, 45, 60, 90, 120];
 const STRIP_DAYS = 60;
 
+// Український множинний відмінок
+function plural(n: number, one: string, few: string, many: string) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+const slotWord = (n: number) => plural(n, 'слот', 'слоти', 'слотів');
+const dayWord = (n: number) => plural(n, 'день', 'дні', 'днів');
+
 export default function SlotsPage() {
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -412,13 +422,17 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
   const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
   const rangeMin = toMin(endTime) - toMin(startTime);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
+  const weekDays = Array.from({ length: 30 }, (_, i) => {
     const d = addDays(startOfDay(new Date()), i);
     return { date: d, str: format(d, 'yyyy-MM-dd') };
   });
 
   function toggleDay(str: string) {
     setSelectedDays(prev => prev.includes(str) ? prev.filter(d => d !== str) : [...prev, str]);
+  }
+  // Швидкий вибір: наступні N днів від сьогодні.
+  function selectNext(n: number) {
+    setSelectedDays(weekDays.slice(0, n).map(d => d.str));
   }
 
   function previewCount() {
@@ -498,11 +512,32 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
             </div>
           ) : (
             <div className="mb-4">
-              <p className="text-xs mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>Дні</p>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  Дні {selectedDays.length > 0 && <span style={{ color: 'var(--tg-theme-button-color)' }}>· обрано {selectedDays.length}</span>}
+                </p>
+                <div className="flex gap-1.5">
+                  {[7, 14, 30].map(n => (
+                    <button key={n} onClick={() => selectNext(n)}
+                      className="text-xs px-2.5 py-1 rounded-lg"
+                      style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
+                      {n} дн
+                    </button>
+                  ))}
+                  {selectedDays.length > 0 && (
+                    <button onClick={() => setSelectedDays([])}
+                      className="text-xs px-2.5 py-1 rounded-lg"
+                      style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1"
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                 {weekDays.map(({ date: d, str }) => (
                   <button key={str} onClick={() => toggleDay(str)}
-                    className="flex flex-col items-center py-2 px-3 rounded-xl text-sm"
+                    className="flex flex-col items-center py-2 px-3 rounded-xl text-sm flex-shrink-0 min-w-[52px]"
                     style={selectedDays.includes(str)
                       ? { background: 'var(--tg-theme-button-color)', color: '#fff' }
                       : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}
@@ -573,10 +608,12 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
               </>
             ) : (
               <>
-                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Буде створено приблизно</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>{totalSlots}</p>
+                <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>Буде створено</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
+                  {totalSlots} {slotWord(totalSlots)}
+                </p>
                 <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
-                  слотів на {selectedDays.length} {selectedDays.length === 1 ? 'день' : 'дні'}
+                  на {selectedDays.length} {dayWord(selectedDays.length)}
                 </p>
               </>
             )}
@@ -596,7 +633,7 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
               boxShadow: 'var(--theme-btn-shadow)',
             }}
           >
-            {saving ? 'Зберігаємо...' : totalSlots === 0 ? 'Оберіть параметри' : mode === 'manual' ? 'Створити слот' : `Створити ${totalSlots} слотів`}
+            {saving ? 'Зберігаємо...' : totalSlots === 0 ? 'Оберіть параметри' : mode === 'manual' ? 'Створити слот' : `Створити ${totalSlots} ${slotWord(totalSlots)}`}
           </button>
         </div>
       </div>
