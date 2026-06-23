@@ -315,7 +315,13 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
 
   const [services, setServices] = useState<SvcLite[]>([]);
   const [clients, setClients] = useState<ClientLite[]>([]);
-  const [date, setDate] = useState(startOfDay(initialDate));
+  // Якщо в розкладі обрано минулий день — для запису стартуємо з сьогодні
+  // (минулих днів немає у стрічці вибору).
+  const [date, setDate] = useState(() => {
+    const today0 = startOfDay(new Date());
+    const init0 = startOfDay(initialDate);
+    return init0.getTime() < today0.getTime() ? today0 : init0;
+  });
   const [slots, setSlots] = useState<SlotLite[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
@@ -331,7 +337,13 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
   useEffect(() => {
     hideNav();
     mastersApi.getById(masterId)
-      .then((m) => setServices((m?.services ?? []).filter((s: SvcLite) => s.isActive !== false)))
+      .then((m) => {
+        const active = (m?.services ?? []).filter((s: SvcLite) => s.isActive !== false);
+        setServices(active);
+        // Автовибір: якщо послуга не обрана — беремо першу (зазвичай їх небагато).
+        // Прибирає «сіру» кнопку, коли майстер забув тапнути по єдиній послузі.
+        setService(prev => prev ?? active[0] ?? null);
+      })
       .catch(() => setServices([]));
     clientsApi.getByMaster(masterId).then(setClients).catch(() => setClients([]));
     return () => showNav();
