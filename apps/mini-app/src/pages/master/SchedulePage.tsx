@@ -303,7 +303,7 @@ function AppointmentCard({ apt, isNew, onConfirm, onCancel, onComplete, onNoShow
 
 interface SvcLite { id: string; name: string; durationMinutes: number; priceType?: PriceType; price: number; priceMax?: number | null; currency: string; isActive?: boolean; }
 interface ClientLite { id: string; fullName: string; phone?: string | null; tag: string; }
-interface SlotLite { id: string; startAt: string; }
+interface SlotLite { id: string; startAt: string; isBooked?: boolean; }
 
 /** Шторка: майстер записує клієнта сам (існуючого або нового офлайн). */
 function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
@@ -342,9 +342,12 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
     setSlot(null);
     const from = date.toISOString();
     const to = addDays(date, 1).toISOString();
-    slotsApi.getAvailable(masterId, from, to)
+    // getForMaster — усі слоти майстра (як на сторінці «Слоти»). Беремо вільні
+    // обраного дня. На відміну від getAvailable, не відкидаємо «минулі» —
+    // майстер бачить ті самі слоти, що й у себе в розкладі.
+    slotsApi.getForMaster(masterId, from, to)
       .then((data: SlotLite[]) =>
-        setSlots(data.filter(s => isSameDay(new Date(s.startAt), date) && new Date(s.startAt).getTime() > Date.now())))
+        setSlots(data.filter(s => !s.isBooked && isSameDay(new Date(s.startAt), date))))
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false));
   }, [date, masterId]);
