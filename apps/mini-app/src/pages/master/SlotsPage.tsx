@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay, addMonths, getDaysInMonth, startOfMonth } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, X, Lock } from 'lucide-react';
@@ -28,8 +28,33 @@ export default function SlotsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [toastClosing, setToastClosing] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
+  const cardEls = useRef<Map<string, HTMLElement>>(new Map());
+  const prevRects = useRef<Map<string, DOMRect>>(new Map());
   const { master } = useMaster();
   const masterId = master?.id ?? '';
+
+  // FLIP: коли слот зникає, решта карток плавно «переїжджають» на нові місця.
+  useLayoutEffect(() => {
+    const newRects = new Map<string, DOMRect>();
+    cardEls.current.forEach((el, id) => {
+      const r = el.getBoundingClientRect();
+      newRects.set(id, r);
+      const prev = prevRects.current.get(id);
+      if (prev) {
+        const dx = prev.left - r.left;
+        const dy = prev.top - r.top;
+        if (dx || dy) {
+          el.style.transition = 'none';
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          requestAnimationFrame(() => {
+            el.style.transition = 'transform 0.3s cubic-bezier(0.32,0.72,0,1)';
+            el.style.transform = '';
+          });
+        }
+      }
+    });
+    prevRects.current = newRects;
+  });
 
   // Кількість вільних слотів (живий лічильник) — без тих, що зникають.
   const freeCount = slots.filter(s => !s.isBooked && !removing.has(s.id)).length;
@@ -195,6 +220,7 @@ export default function SlotsPage() {
               return (
               <div
                 key={slot.id}
+                ref={(el) => { if (el) cardEls.current.set(slot.id, el); else cardEls.current.delete(slot.id); }}
                 className={`rounded-xl p-3 flex items-center justify-between ${isRemoving ? 'bb-shrink-out' : ''}`}
                 style={{
                   background: slot.isBooked ? 'var(--tg-theme-bg-color)' : 'var(--tg-theme-secondary-bg-color)',
