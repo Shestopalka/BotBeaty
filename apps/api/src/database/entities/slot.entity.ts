@@ -3,7 +3,9 @@ import { BaseEntity } from './base.entity';
 import { Master } from './master.entity';
 
 @Entity('slots')
-@Index(['masterId', 'startAt'], { unique: true }) // Захист від дублікатів
+// Частковий unique: лише активні слоти унікальні за (masterId, startAt).
+// Soft-deleted слоти не блокують повторне створення на той самий час.
+@Index(['masterId', 'startAt'], { unique: true, where: '"deletedAt" IS NULL' })
 @Check('"endAt" > "startAt"')
 export class Slot extends BaseEntity {
   @Column({ type: 'uuid' })

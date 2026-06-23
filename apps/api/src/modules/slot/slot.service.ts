@@ -79,22 +79,10 @@ export class SlotService {
 
     if (!slots.length) throw new BadRequestException('Не вдалось згенерувати слоти');
 
-    // INSERT ... ON CONFLICT DO NOTHING — ігноруємо дублікати по (masterId, startAt)
+    // INSERT ... ON CONFLICT DO NOTHING — ігноруємо дублікати по (masterId, startAt).
+    // Unique-індекс тепер ЧАСТКОВИЙ (WHERE deletedAt IS NULL), тож раніше soft-deleted
+    // слоти НЕ конфліктують — прибирати їх вручну більше не треба.
     const startTimes = slots.map(s => s.startAt!);
-
-    // Прибираємо РАНІШЕ soft-deleted слоти на ці ж часи (hard delete).
-    // Інакше unique-індекс (masterId, startAt) включає видалені рядки, і
-    // повторне створення слота на той самий час мовчки ігнорується (orIgnore).
-    if (startTimes.length) {
-      await this.slotRepo
-        .createQueryBuilder()
-        .delete()
-        .from(Slot)
-        .where('"masterId" = :masterId', { masterId: dto.masterId })
-        .andWhere('"startAt" IN (:...times)', { times: startTimes })
-        .andWhere('"deletedAt" IS NOT NULL')
-        .execute();
-    }
 
     await this.slotRepo
       .createQueryBuilder()
@@ -167,8 +155,11 @@ export class SlotService {
       where: { id: slotId, masterId, isBooked: false },
     });
     if (!slot) throw new NotFoundException('Слот не знайдено або він вже зайнятий');
-    // HARD delete: слот вільний (не звʼязаний із записом), тож видаляємо назовсім,
-    // щоб звільнити час (masterId, startAt) для повторного створення.
-    await this.slotRepo.delete({ id: slotId });
+    // SOFT delete: на слот можуть посилатися записи (напр. скасовані), тож hard
+    // delete впав би на зовнішньому ключі (Internal Server Error). Ховаємо слот —
+    // рядок лишається, історія записів ціла. Частковий unique-індекс
+    // (masterId, startAt) WHERE deletedAt IS NULL дозволяє згодом створити
+    // активний слот на той самий час.
+    await this.slotRepo.softDelete(slotId);
   }
 }
