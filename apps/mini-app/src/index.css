@@ -148,3 +148,25 @@ body {
   animation: bb-new-card 0.45s cubic-bezier(0.32, 0.72, 0, 1) both,
              bb-new-ring 1.6s ease-out 0.3s both;
 }
+
+/* Зникнення слота при видаленні */
+@keyframes bb-shrink-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.82); }
+}
+.bb-shrink-out {
+  animation: bb-shrink-out 0.26s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+/* Тост (повідомлення в інтерфейсі) */
+@keyframes bb-toast-in {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bb-toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-14px); }
+}
+.bb-toast-in  { animation: bb-toast-in 0.28s cubic-bezier(0.32,0.72,0,1) both; }
+.bb-toast-out { animation: bb-toast-out 0.25s ease forwards; }

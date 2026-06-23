@@ -6,7 +6,6 @@ import { slotsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
-import { showApiError } from '../../lib/notify';
 
 interface Slot {
   id: string;
@@ -25,9 +24,23 @@ export default function SlotsPage() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastClosing, setToastClosing] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const { master } = useMaster();
   const masterId = master?.id ?? '';
+
+  // Кількість вільних слотів (живий лічильник) — без тих, що зникають.
+  const freeCount = slots.filter(s => !s.isBooked && !removing.has(s.id)).length;
+
+  function showToast(msg: string) {
+    setToastClosing(false);
+    setToast(msg);
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error');
+    window.setTimeout(() => setToastClosing(true), 2600);
+    window.setTimeout(() => setToast(null), 2900);
+  }
 
   useEffect(() => { loadSlots(); }, [selectedDate]);
 
@@ -55,12 +68,22 @@ export default function SlotsPage() {
   }
 
   async function deleteSlot(id: string) {
+    // Захист від повторних кліків: якщо слот уже видаляється — ігноруємо.
+    if (removing.has(id)) return;
+    setRemoving(prev => new Set(prev).add(id)); // запускає анімацію + блокує кнопку
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light');
     try {
       await slotsApi.delete(id, masterId);
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
-      loadSlots();
-    } catch (e) {
-      showApiError(e, 'Не вдалось видалити слот.');
+      // Прибираємо зі списку після короткої анімації зникнення.
+      window.setTimeout(() => {
+        setSlots(prev => prev.filter(s => s.id !== id));
+        setRemoving(prev => { const n = new Set(prev); n.delete(id); return n; });
+      }, 260);
+    } catch {
+      // Відновлюємо картку й показуємо тост в інтерфейсі (без нативного алерта).
+      setRemoving(prev => { const n = new Set(prev); n.delete(id); return n; });
+      showToast('Не вдалось видалити слот');
     }
   }
 
@@ -68,11 +91,22 @@ export default function SlotsPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Тост помилки — у самому інтерфейсі, не нативний алерт */}
+      {toast && (
+        <div className={`${toastClosing ? 'bb-toast-out' : 'bb-toast-in'}`}
+          style={{ position: 'fixed', top: 'max(16px, env(safe-area-inset-top))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, maxWidth: '90%' }}>
+          <div className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium"
+            style={{ background: '#c0404022', color: '#e05c5c', border: '1px solid #e05c5c55', boxShadow: 'var(--theme-shadow)', backdropFilter: 'blur(8px)' }}>
+            <X size={15} /> {toast}
+          </div>
+        </div>
+      )}
+
       <div className="px-4 pt-4 pb-2 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold">Мої слоти</h1>
           <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
-            {format(selectedDate, 'd MMMM', { locale: uk })}
+            {format(selectedDate, 'd MMMM', { locale: uk })} · {freeCount} вільних
           </p>
         </div>
         <div className="flex gap-2">
@@ -156,10 +190,12 @@ export default function SlotsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            {slots.map((slot) => (
+            {slots.map((slot) => {
+              const isRemoving = removing.has(slot.id);
+              return (
               <div
                 key={slot.id}
-                className="rounded-xl p-3 flex items-center justify-between"
+                className={`rounded-xl p-3 flex items-center justify-between ${isRemoving ? 'bb-shrink-out' : ''}`}
                 style={{
                   background: slot.isBooked ? 'var(--tg-theme-bg-color)' : 'var(--tg-theme-secondary-bg-color)',
                   border: slot.isBooked ? '1px solid var(--tg-theme-hint-color)' : 'none',
@@ -175,12 +211,17 @@ export default function SlotsPage() {
                   </p>
                 </div>
                 {!slot.isBooked && (
-                  <button onClick={() => deleteSlot(slot.id)} className="p-1.5 rounded-lg text-red-400">
+                  <button
+                    onClick={() => deleteSlot(slot.id)}
+                    disabled={isRemoving}
+                    className="p-1.5 rounded-lg text-red-400 disabled:opacity-40"
+                  >
                     <Trash2 size={14} />
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -195,6 +236,7 @@ export default function SlotsPage() {
           defaultBreakMinutes={master?.defaultBreakMinutes ?? 15}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); loadSlots(); }}
+          onError={showToast}
         />
       )}
 
@@ -303,8 +345,9 @@ function CalendarModal({ selected, onSelect, onClose }: {
 }
 
 // ─── Bottom sheet для додавання слотів ───────────────────────────────────────
-function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, defaultWorkEnd, defaultSlotDuration, defaultBreakMinutes }: {
+function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkStart, defaultWorkEnd, defaultSlotDuration, defaultBreakMinutes }: {
   masterId: string; date: Date; onClose: () => void; onSaved: () => void;
+  onError: (msg: string) => void;
   defaultWorkStart: string; defaultWorkEnd: string;
   defaultSlotDuration: number; defaultBreakMinutes: number;
 }) {
@@ -376,8 +419,9 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, defaultWorkStart, def
       }
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       handleSaved();
-    } catch (e) {
-      showApiError(e, 'Не вдалось створити слоти.');
+    } catch (e: any) {
+      const m = e?.response?.data?.message;
+      onError(Array.isArray(m) ? m.join(', ') : (m || 'Не вдалось створити слоти.'));
     } finally {
       setSaving(false);
     }
