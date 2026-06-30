@@ -22,9 +22,12 @@
       window.addEventListener('unhandledrejection', function(e) {
         showErr('Promise Error', String(e.reason && e.reason.stack ? e.reason.stack.slice(0,400) : e.reason));
       });
-      // Ловимо помилки завантаження ресурсів (<script>, <link>)
+      // Ловимо помилки завантаження КРИТИЧНИХ ресурсів (<script>, <link>).
+      // Зображення (напр. аватар, якого може не бути -> 404) ІГНОРУЄМО:
+      // зламана картинка не повинна валити весь застосунок (її обробляє onError).
       window.addEventListener('error', function(e) {
         if (e.target && e.target !== window) {
+          if ((e.target.tagName || '').toUpperCase() === 'IMG') return;
           showErr('Resource Error', 'Failed to load: ' + (e.target.src || e.target.href || 'unknown'));
         }
       }, true);
