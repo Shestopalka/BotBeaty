@@ -38,7 +38,6 @@ export default function SchedulePage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const masterId = master?.id ?? '';
-  const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 380);
   const [showBook, setShowBook] = useState(false);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [removingApt, setRemovingApt] = useState<Set<string>>(new Set());
@@ -80,12 +79,6 @@ export default function SchedulePage() {
     return () => clearInterval(id);
   }, [masterId, selectedDate]);
 
-  useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   async function loadAppointments(diff: boolean) {
     if (!diff) setLoading(true);
     try {
@@ -114,8 +107,8 @@ export default function SchedulePage() {
   }
 
   // Адаптивна к-сть дат: 7 на телефоні, більше — на ширшому екрані.
-  const dayCount = Math.min(30, Math.max(7, Math.floor((vw - 48) / 54)));
-  const weekDays = Array.from({ length: dayCount }, (_, i) => addDays(startOfDay(new Date()), i));
+  // Стрічка на ~2 місяці вперед — гортається горизонтально.
+  const weekDays = Array.from({ length: 62 }, (_, i) => addDays(startOfDay(new Date()), i));
   const todayAppointments = appointments.filter(apt =>
     isSameDay(new Date(apt.slot?.startAt ?? Date.now()), selectedDate)
   );
@@ -136,14 +129,15 @@ export default function SchedulePage() {
         </button>
       </div>
 
-      {/* Тижневий календар */}
-      <div className="flex gap-2 px-5 py-3 overflow-x-auto">
+      {/* Календар-стрічка (~2 міс наперед, гортається) */}
+      <div className="flex gap-2 px-5 py-3 overflow-x-auto"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
         {weekDays.map((day) => {
           const isSel = isSameDay(day, selectedDate);
           const isToday = isSameDay(day, new Date());
           return (
             <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
-              className="flex flex-col items-center min-w-[48px] py-2.5 px-1 rounded-2xl transition-all"
+              className="flex flex-col items-center min-w-[48px] flex-shrink-0 py-2.5 px-1 rounded-2xl transition-all"
               style={isSel ? {
                 background: 'var(--tg-theme-button-color)',
                 color: 'var(--tg-theme-button-text-color)',
