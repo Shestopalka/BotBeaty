@@ -446,6 +446,28 @@ export class AppointmentService {
     });
   }
 
+  /**
+   * Повне видалення запису (безповоротно) — щоб не «мозолив очі» в розкладі.
+   * Якщо слот був ще заброньований — звільняємо його. Чистимо аудит-лог.
+   */
+  async deleteAppointment(appointmentId: string, masterId: string): Promise<{ deleted: true }> {
+    return await this.dataSource.transaction(async (manager) => {
+      const apt = await manager.getRepository(Appointment).findOne({
+        where: { id: appointmentId, masterId },
+        withDeleted: true,
+      });
+      if (!apt) throw new NotFoundException('Запис не знайдено');
+
+      // Якщо слот ще зайнятий цим записом — звільняємо.
+      if (apt.slotId) {
+        await manager.getRepository(Slot).update(apt.slotId, { isBooked: false });
+      }
+      await manager.getRepository(AuditLog).delete({ recordId: appointmentId });
+      await manager.getRepository(Appointment).delete({ id: appointmentId });
+      return { deleted: true };
+    });
+  }
+
   async getByMaster(masterId: string, date?: Date): Promise<Appointment[]> {
     const qb = this.appointmentRepo
       .createQueryBuilder('apt')

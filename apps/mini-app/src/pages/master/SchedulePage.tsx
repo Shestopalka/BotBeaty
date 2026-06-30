@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus } from 'lucide-react';
+import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2 } from 'lucide-react';
 import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
@@ -41,7 +41,26 @@ export default function SchedulePage() {
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 380);
   const [showBook, setShowBook] = useState(false);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [removingApt, setRemovingApt] = useState<Set<string>>(new Set());
   const seenIds = useRef<Set<string>>(new Set());
+
+  function deleteApt(id: string) {
+    if (removingApt.has(id)) return;
+    setRemovingApt(prev => new Set(prev).add(id));
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light');
+    appointmentsApi.delete(id)
+      .then(() => {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+        setTimeout(() => {
+          setAppointments(prev => prev.filter(a => a.id !== id));
+          setRemovingApt(prev => { const n = new Set(prev); n.delete(id); return n; });
+        }, 280);
+      })
+      .catch((e) => {
+        setRemovingApt(prev => { const n = new Set(prev); n.delete(id); return n; });
+        showApiError(e, 'Не вдалось видалити запис.');
+      });
+  }
 
   // Зміна дати / майстра — завантажуємо без діфу (нічого не анімуємо).
   useEffect(() => {
@@ -159,6 +178,8 @@ export default function SchedulePage() {
         ) : (
           todayAppointments.map(apt => (
             <AppointmentCard key={apt.id} apt={apt} isNew={newIds.has(apt.id)}
+              isRemoving={removingApt.has(apt.id)}
+              onDelete={() => deleteApt(apt.id)}
               onConfirm={() => updateStatus(apt.id, 'confirmed')}
               onCancel={() => updateStatus(apt.id, 'cancelled_master')}
               onComplete={() => updateStatus(apt.id, 'completed')}
@@ -180,9 +201,10 @@ export default function SchedulePage() {
   );
 }
 
-function AppointmentCard({ apt, isNew, onConfirm, onCancel, onComplete, onNoShow }: {
-  apt: Appointment; isNew?: boolean; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
+function AppointmentCard({ apt, isNew, isRemoving, onDelete, onConfirm, onCancel, onComplete, onNoShow }: {
+  apt: Appointment; isNew?: boolean; isRemoving?: boolean; onDelete: () => void; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
 }) {
+  const terminal = ['cancelled_client', 'cancelled_master', 'no_show', 'completed'].includes(apt.status);
   const startTime = format(new Date(apt.slot?.startAt ?? Date.now()), 'HH:mm');
   const endTime = format(new Date(apt.slot?.endAt ?? Date.now()), 'HH:mm');
   const status = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG.pending;
@@ -199,7 +221,7 @@ function AppointmentCard({ apt, isNew, onConfirm, onCancel, onComplete, onNoShow
   }
 
   return (
-    <div className={`rounded-2xl p-4 space-y-3 ${isNew ? 'bb-new-card' : ''}`} style={{
+    <div className={`rounded-2xl p-4 space-y-3 ${isNew ? 'bb-new-card' : ''} ${isRemoving ? 'bb-shrink-out' : ''}`} style={{
       background: 'var(--tg-theme-secondary-bg-color)',
       boxShadow: 'var(--theme-shadow)',
     }}>
@@ -210,10 +232,18 @@ function AppointmentCard({ apt, isNew, onConfirm, onCancel, onComplete, onNoShow
             {startTime} — {endTime}
           </span>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-          style={{ background: status.bg, color: status.color }}>
-          {status.label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{ background: status.bg, color: status.color }}>
+            {status.label}
+          </span>
+          {terminal && (
+            <button onClick={onDelete} disabled={isRemoving} title="Видалити запис"
+              className="p-1 rounded-lg disabled:opacity-40" style={{ color: '#c04040' }}>
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

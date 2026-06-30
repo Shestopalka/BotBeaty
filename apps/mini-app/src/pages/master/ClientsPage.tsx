@@ -37,10 +37,31 @@ export default function ClientsPage() {
   const [activeTag, setActiveTag] = useState('');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Client | null>(null);
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
   const { master } = useMaster();
   const masterId = master?.id ?? '';
 
   useEffect(() => { loadClients(); }, [activeTag, masterId]);
+
+  function deleteClient(clientId: string) {
+    if (removing.has(clientId)) return;
+    setSelected(null);
+    setRemoving(prev => new Set(prev).add(clientId)); // анімація зникнення
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light');
+    clientsApi.delete(clientId, masterId)
+      .then(() => {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+        setTimeout(() => {
+          setClients(prev => prev.filter(c => c.id !== clientId));
+          setRemoving(prev => { const n = new Set(prev); n.delete(clientId); return n; });
+        }, 280);
+      })
+      .catch(() => {
+        setRemoving(prev => { const n = new Set(prev); n.delete(clientId); return n; });
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+        (window.Telegram?.WebApp as any)?.showAlert?.('Не вдалось видалити клієнта');
+      });
+  }
 
   async function loadClients() {
     if (!masterId) return;
@@ -124,7 +145,7 @@ export default function ClientsPage() {
           filtered.map(client => {
             const tagCfg = TAG_CONFIG[client.tag];
             return (
-              <div key={client.id} className="flex items-center gap-3 p-3.5 rounded-2xl"
+              <div key={client.id} className={`flex items-center gap-3 p-3.5 rounded-2xl ${removing.has(client.id) ? 'bb-shrink-out' : ''}`}
                 style={{ background: 'var(--tg-theme-secondary-bg-color)', boxShadow: 'var(--theme-shadow)' }}>
                 {/* Аватар */}
                 <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-base flex-shrink-0"
@@ -179,15 +200,17 @@ export default function ClientsPage() {
           onClose={() => setSelected(null)}
           onTagChange={tag => changeTag(selected.id, tag)}
           onSaveNotes={notes => saveNotes(selected.id, notes)}
+          onDelete={() => deleteClient(selected.id)}
         />
       )}
     </div>
   );
 }
 
-function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes }: {
+function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes, onDelete }: {
   client: Client; masterId: string; onClose: () => void;
   onTagChange: (tag: string) => void; onSaveNotes: (notes: string) => void;
+  onDelete: () => void;
 }) {
   const { hideNav, showNav } = useUI();
   const [closing, setClosing] = useState(false);
@@ -344,6 +367,18 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
               </button>
             ))}
           </div>
+
+          {/* Видалити клієнта (безповоротно, з його записами) */}
+          <button onClick={() => {
+              const tg: any = window.Telegram?.WebApp;
+              const go = () => onDelete();
+              if (tg?.showConfirm) tg.showConfirm(`Видалити «${client.fullName}» і всі його записи? Це безповоротно.`, (ok: boolean) => { if (ok) go(); });
+              else if (window.confirm('Видалити клієнта і всі його записи?')) go();
+            }}
+            className="w-full text-left py-3.5 px-4 mt-2 rounded-2xl text-sm font-medium"
+            style={{ background: 'rgba(224,92,92,0.12)', color: '#c04040' }}>
+            🗑 Видалити клієнта
+          </button>
 
           <button onClick={handleClose}
             className="w-full py-4 mt-2 rounded-2xl text-sm font-medium"

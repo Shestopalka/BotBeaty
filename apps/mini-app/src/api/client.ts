@@ -56,6 +56,7 @@ export const appointmentsApi = {
   create: (data: any) => api.post('/appointments', data).then(r => r.data),
   // Майстер записує клієнта сам (телефонний/офлайн запис).
   createByMaster: (data: any) => api.post('/appointments/by-master', data).then(r => r.data),
+  delete: (id: string) => api.delete(`/appointments/${id}`).then(r => r.data),
 };
 
 // ─── Slots ────────────────────────────────────────────────────────────────────
@@ -89,4 +90,6 @@ export const clientsApi = {
     api.patch(`/clients/${id}/notes`, { masterId, notes }).then(r => r.data),
   block: (id: string, masterId: string) =>
     api.post(`/clients/${id}/block`, { masterId }).then(r => r.data),
+  delete: (id: string, masterId: string) =>
+    api.delete(`/clients/${id}`, { params: { masterId } }).then(r => r.data),
 };

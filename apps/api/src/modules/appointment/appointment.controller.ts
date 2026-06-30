@@ -3,6 +3,7 @@ import {
   Post,
   Patch,
   Get,
+  Delete,
   Body,
   Param,
   Query,
@@ -88,5 +89,11 @@ export class AppointmentController {
       throw new ForbiddenException('Доступ лише для зареєстрованих майстрів');
     }
     return this.appointmentService.updateStatus(id, masterId, body.status);
+  }
+
+  // Майстер повністю видаляє запис (щоб не лишався в розкладі). masterId — з авт.
+  @Delete(':id')
+  delete(@Param('id') id: string, @CurrentMasterId() masterId: string) {
+    return this.appointmentService.deleteAppointment(id, masterId);
   }
 }

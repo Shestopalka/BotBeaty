@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Body, Param, Query } from '@nestjs/common';
 import { ClientService } from './client.service';
 import { ClientTag } from '../../database/entities/client.entity';
 import { CurrentMasterId } from '../../common/decorators/current-master.decorator';
@@ -38,5 +38,10 @@ export class ClientController {
   @Post(':id/block')
   block(@Param('id') id: string, @CurrentMasterId() masterId: string) {
     return this.clientService.block(id, masterId);
+  }
+
+  @Delete(':id')
+  delete(@Param('id') id: string, @CurrentMasterId() masterId: string) {
+    return this.clientService.delete(id, masterId);
   }
 }

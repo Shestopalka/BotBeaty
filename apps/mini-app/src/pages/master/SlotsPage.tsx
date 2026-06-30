@@ -320,13 +320,15 @@ function CalendarModal({ selected, onSelect, onClose }: {
         style={{ background: 'var(--tg-theme-bg-color)' }}
         onClick={e => e.stopPropagation()}
       >
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 p-1.5 rounded-xl"
-          style={{ background: 'var(--tg-theme-secondary-bg-color)' }}
-        >
-          <X size={16} />
-        </button>
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={handleClose}
+            className="p-2 rounded-xl"
+            style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => setViewMonth(m => addMonths(m, -1))} className="p-2 rounded-xl" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
             <ChevronLeft size={16} />
