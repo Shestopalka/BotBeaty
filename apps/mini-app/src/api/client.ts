@@ -51,6 +51,9 @@ export const mastersApi = {
 export const appointmentsApi = {
   getByMaster: (masterId: string, date?: string) =>
     api.get(`/appointments/master/${masterId}`, { params: { date } }).then(r => r.data),
+  // Дні із записами (для крапок у календарі)
+  getDays: (masterId: string, from: string, to: string) =>
+    api.get(`/appointments/master/${masterId}/days`, { params: { from, to } }).then(r => r.data),
   updateStatus: (id: string, masterId: string, status: string) =>
     api.patch(`/appointments/${id}/status`, { masterId, status }).then(r => r.data),
   create: (data: any) => api.post('/appointments', data).then(r => r.data),

@@ -65,6 +65,16 @@ export class AppointmentController {
     );
   }
 
+  // Дні із записами (для крапок у календарі).
+  @Get('master/:masterId/days')
+  getDays(
+    @CurrentMasterId() masterId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.appointmentService.getDaysWithAppointments(masterId, new Date(from), new Date(to));
+  }
+
   // Один ендпоінт обслуговує і майстра, і клієнта — розгалужуємо за статусом
   // і перевіряємо відповідні права для кожного шляху.
   @Patch(':id/status')

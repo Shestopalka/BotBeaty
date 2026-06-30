@@ -468,6 +468,23 @@ export class AppointmentService {
     });
   }
 
+  /**
+   * Київські дати (YYYY-MM-DD) у діапазоні, де є хоч один активний запис —
+   * для позначок-крапок у календарі майстра.
+   */
+  async getDaysWithAppointments(masterId: string, from: Date, to: Date): Promise<string[]> {
+    const rows = await this.appointmentRepo
+      .createQueryBuilder('apt')
+      .innerJoin('apt.slot', 's')
+      .select(`to_char((s."startAt" AT TIME ZONE 'Europe/Kyiv'), 'YYYY-MM-DD')`, 'd')
+      .where('apt.masterId = :masterId', { masterId })
+      .andWhere('apt.deletedAt IS NULL')
+      .andWhere('s."startAt" BETWEEN :from AND :to', { from, to })
+      .groupBy('d')
+      .getRawMany();
+    return rows.map((r) => r.d);
+  }
+
   async getByMaster(masterId: string, date?: Date): Promise<Appointment[]> {
     const qb = this.appointmentRepo
       .createQueryBuilder('apt')

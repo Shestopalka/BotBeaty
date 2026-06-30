@@ -6,6 +6,7 @@ import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/cli
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
+import { CalendarModal } from '../../components/CalendarModal';
 import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
 import { showApiError } from '../../lib/notify';
 
@@ -39,6 +40,17 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(false);
   const masterId = master?.id ?? '';
   const [showBook, setShowBook] = useState(false);
+  const [showCal, setShowCal] = useState(false);
+  const [markedDays, setMarkedDays] = useState<Set<string>>(new Set());
+
+  function loadMarks() {
+    if (!masterId) return;
+    const from = addDays(startOfDay(new Date()), -31).toISOString();
+    const to = addDays(startOfDay(new Date()), 120).toISOString();
+    appointmentsApi.getDays(masterId, from, to)
+      .then((d: string[]) => setMarkedDays(new Set(d)))
+      .catch(() => {});
+  }
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [removingApt, setRemovingApt] = useState<Set<string>>(new Set());
   const seenIds = useRef<Set<string>>(new Set());
@@ -67,6 +79,7 @@ export default function SchedulePage() {
     seenIds.current = new Set();
     setNewIds(new Set());
     loadAppointments(false);
+    loadMarks();
   }, [selectedDate, masterId]);
 
   // Розумний полінг: тихо оновлюємо розклад, поки сторінка відкрита й активна.
@@ -106,7 +119,6 @@ export default function SchedulePage() {
     } catch (e) { showApiError(e, 'Не вдалось оновити запис.'); }
   }
 
-  // Адаптивна к-сть дат: 7 на телефоні, більше — на ширшому екрані.
   // Стрічка на ~2 місяці вперед — гортається горизонтально.
   const weekDays = Array.from({ length: 62 }, (_, i) => addDays(startOfDay(new Date()), i));
   const todayAppointments = appointments.filter(apt =>
@@ -122,11 +134,19 @@ export default function SchedulePage() {
             {format(selectedDate, 'd MMMM yyyy', { locale: uk })}
           </p>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+        <button onClick={() => { loadMarks(); setShowCal(true); }}
+          className="p-2.5 rounded-xl"
+          style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-button-color)' }}
+          title="Календар">
+          <Calendar size={18} />
+        </button>
         <button onClick={() => setShowBook(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold shrink-0"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold"
           style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
           <Plus size={15} strokeWidth={2.5} /> Записати
         </button>
+        </div>
       </div>
 
       {/* Календар-стрічка (~2 міс наперед, гортається) */}
@@ -188,7 +208,16 @@ export default function SchedulePage() {
           masterId={masterId}
           initialDate={selectedDate}
           onClose={() => setShowBook(false)}
-          onCreated={(d) => { setShowBook(false); setSelectedDate(startOfDay(d)); loadAppointments(false); }}
+          onCreated={(d) => { setShowBook(false); setSelectedDate(startOfDay(d)); loadAppointments(false); loadMarks(); }}
+        />
+      )}
+
+      {showCal && (
+        <CalendarModal
+          selected={selectedDate}
+          markedDays={markedDays}
+          onSelect={(d) => { setSelectedDate(startOfDay(d)); setShowCal(false); }}
+          onClose={() => setShowCal(false)}
         />
       )}
     </div>
