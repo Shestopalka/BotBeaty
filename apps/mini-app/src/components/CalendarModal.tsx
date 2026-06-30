@@ -38,8 +38,8 @@ export function CalendarModal({ selected, onSelect, onClose, markedDays }: {
     <div className="fixed inset-0 flex items-end" style={{ zIndex: 200 }} onClick={handleClose}>
       <div className={`${closing ? 'bb-backdrop-out' : 'bb-backdrop'} absolute inset-0 bg-black/50`} />
       <div
-        className={`${closing ? 'bb-sheet-out' : 'bb-sheet'} relative w-full rounded-t-3xl p-5`}
-        style={{ background: 'var(--tg-theme-bg-color)' }}
+        className={`${closing ? 'bb-sheet-out' : 'bb-sheet'} relative w-full rounded-t-3xl p-5 mx-auto overflow-y-auto`}
+        style={{ background: 'var(--tg-theme-bg-color)', maxWidth: 520, maxHeight: '88vh' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-end mb-2">
@@ -72,10 +72,13 @@ export function CalendarModal({ selected, onSelect, onClose, markedDays }: {
             const marked = markedDays?.has(format(d, 'yyyy-MM-dd'));
             return (
               <button key={d.toISOString()} onClick={() => pick(d)}
-                className="relative aspect-square rounded-xl flex items-center justify-center text-sm font-medium"
-                style={sel
-                  ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
-                  : { background: 'var(--tg-theme-secondary-bg-color)', color: isToday ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-text-color)' }}>
+                className="relative rounded-xl flex items-center justify-center text-sm font-medium"
+                style={{
+                  height: 52,
+                  ...(sel
+                    ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                    : { background: 'var(--tg-theme-secondary-bg-color)', color: isToday ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-text-color)' }),
+                }}>
                 {format(d, 'd')}
                 {marked && (
                   <span className="absolute" style={{
