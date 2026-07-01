@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, addMonths, getDaysInMonth, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useUI } from '../context/UIContext';
 
 /**
  * Модалка-календар із вибором дати. markedDays — набір дат 'yyyy-MM-dd',
@@ -13,9 +14,14 @@ export function CalendarModal({ selected, onSelect, onClose, markedDays }: {
   onClose: () => void;
   markedDays?: Set<string>;
 }) {
+  const { hideNav, showNav } = useUI();
   const [closing, setClosing] = useState(false);
   const [viewMonth, setViewMonth] = useState(startOfDay(selected));
   const CLOSE_MS = 280;
+
+  // Ховаємо нижню навігацію, поки календар відкритий (інакше вона перекриває
+  // останній тиждень).
+  useEffect(() => { hideNav(); return () => showNav(); }, []);
 
   function handleClose() {
     if (closing) return;
