@@ -37,6 +37,8 @@ export class NotificationProcessor extends WorkerHost {
         return this.handleAppointmentCreated(job.data);
       case 'appointment_status_changed':
         return this.handleStatusChanged(job.data);
+      case 'appointment_rescheduled':
+        return this.handleRescheduled(job.data);
       case 'reminder_24h':
         return this.handleReminder(job.data, '24');
       case 'reminder_2h':
@@ -155,6 +157,31 @@ export class NotificationProcessor extends WorkerHost {
       } catch (e) {
         this.logger.warn(`sendToMaster (cancel) failed: ${e.message}`);
       }
+    }
+  }
+
+  private async handleRescheduled(data: {
+    appointmentId: string;
+    oldTime: string;
+    newTime: string;
+  }) {
+    const apt = await this.appointmentRepo.findOne({
+      where: { id: data.appointmentId },
+      relations: ['client', 'service'],
+    });
+    if (!apt?.client?.telegramId) return;
+    try {
+      await this.botService.sendToClient(
+        apt.masterId,
+        apt.client.telegramId,
+        `🔄 <b>Ваш запис перенесено</b>\n` +
+        `💅 ${apt.service?.name ?? '—'}\n` +
+        (data.oldTime ? `Було: ${data.oldTime}\n` : '') +
+        `Стало: <b>${data.newTime}</b>`,
+        { parse_mode: 'HTML' },
+      );
+    } catch (e) {
+      this.logger.warn(`sendToClient (reschedule) failed: ${e.message}`);
     }
   }
 

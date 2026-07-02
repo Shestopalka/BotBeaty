@@ -472,6 +472,86 @@ export class AppointmentService {
   }
 
   /**
+   * Перенести запис на інший ВІЛЬНИЙ слот. Звільняє старий слот, бронює новий,
+   * повідомляє клієнта про новий час.
+   */
+  async reschedule(appointmentId: string, newSlotId: string, masterId: string): Promise<Appointment> {
+    const fmt = (dt: any) =>
+      new Date(dt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' });
+    return await this.dataSource.transaction(async (m) => {
+      const apt = await m.getRepository(Appointment).findOne({
+        where: { id: appointmentId, masterId }, relations: ['slot'],
+      });
+      if (!apt) throw new NotFoundException('Запис не знайдено');
+      if (apt.status !== AppointmentStatus.PENDING && apt.status !== AppointmentStatus.CONFIRMED) {
+        throw new BadRequestException('Переносити можна лише активні записи');
+      }
+      if (apt.slotId === newSlotId) return apt;
+
+      const newSlot = await m.getRepository(Slot).createQueryBuilder('s')
+        .setLock('pessimistic_write')
+        .where('s.id = :id', { id: newSlotId })
+        .andWhere('s.masterId = :m', { m: masterId })
+        .andWhere('s.deletedAt IS NULL')
+        .getOne();
+      if (!newSlot) throw new NotFoundException('Слот не знайдено');
+      if (newSlot.isBooked) throw new ConflictException('Цей час уже зайнятий');
+
+      const oldTime = apt.slot?.startAt ? fmt(apt.slot.startAt) : '';
+      if (apt.slotId) await m.getRepository(Slot).update(apt.slotId, { isBooked: false });
+      await m.getRepository(Slot).update(newSlot.id, { isBooked: true });
+      apt.slotId = newSlot.id;
+      const saved = await m.getRepository(Appointment).save(apt);
+
+      await m.getRepository(AuditLog).save({
+        tableName: 'appointments', recordId: saved.id, action: AuditAction.UPDATE,
+        oldData: { slotTime: oldTime }, newData: { slotTime: fmt(newSlot.startAt) },
+        changedBy: masterId, changedByType: 'master',
+      });
+
+      await this.notificationsQueue.add('appointment_rescheduled', {
+        appointmentId: saved.id, oldTime, newTime: fmt(newSlot.startAt),
+      }).catch(() => {});
+      return saved;
+    });
+  }
+
+  /**
+   * Поміняти місцями два записи (їхні слоти). Обидва лишаються заброньованими,
+   * кожному клієнту йде повідомлення про новий час.
+   */
+  async swap(aptAId: string, aptBId: string, masterId: string): Promise<{ swapped: true }> {
+    const fmt = (dt: any) =>
+      new Date(dt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' });
+    if (aptAId === aptBId) throw new BadRequestException('Оберіть два різні записи');
+    return await this.dataSource.transaction(async (m) => {
+      const A = await m.getRepository(Appointment).findOne({ where: { id: aptAId, masterId }, relations: ['slot'] });
+      const B = await m.getRepository(Appointment).findOne({ where: { id: aptBId, masterId }, relations: ['slot'] });
+      if (!A || !B) throw new NotFoundException('Запис не знайдено');
+      const active = (s: AppointmentStatus) => s === AppointmentStatus.PENDING || s === AppointmentStatus.CONFIRMED;
+      if (!active(A.status) || !active(B.status)) throw new BadRequestException('Міняти місцями можна лише активні записи');
+
+      const slotA = A.slotId, slotB = B.slotId;
+      const timeA = A.slot?.startAt ? fmt(A.slot.startAt) : '';
+      const timeB = B.slot?.startAt ? fmt(B.slot.startAt) : '';
+      // 3 кроки, щоб не зачепити partial-unique на slotId (тимчасово відчеплюємо A).
+      await m.getRepository(Appointment).update(A.id, { slotId: null });
+      await m.getRepository(Appointment).update(B.id, { slotId: slotA });
+      await m.getRepository(Appointment).update(A.id, { slotId: slotB });
+
+      for (const [id] of [[A.id], [B.id]]) {
+        await m.getRepository(AuditLog).save({
+          tableName: 'appointments', recordId: id, action: AuditAction.UPDATE,
+          oldData: { swap: true }, newData: { swap: true }, changedBy: masterId, changedByType: 'master',
+        });
+      }
+      await this.notificationsQueue.add('appointment_rescheduled', { appointmentId: A.id, oldTime: timeA, newTime: timeB }).catch(() => {});
+      await this.notificationsQueue.add('appointment_rescheduled', { appointmentId: B.id, oldTime: timeB, newTime: timeA }).catch(() => {});
+      return { swapped: true };
+    });
+  }
+
+  /**
    * Київські дати (YYYY-MM-DD) у діапазоні, де є хоч один активний запис —
    * для позначок-крапок у календарі майстра.
    */

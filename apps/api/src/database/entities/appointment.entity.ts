@@ -51,8 +51,10 @@ export class Appointment extends BaseEntity {
   @JoinColumn({ name: 'serviceId' })
   service: Service;
 
-  @Column({ type: 'uuid' })
-  slotId: string;
+  // nullable — щоб при обміні записів місцями можна було тимчасово «відчепити»
+  // слот у транзакції (інакше partial-unique конфліктує). У нормі завжди заповнене.
+  @Column({ type: 'uuid', nullable: true })
+  slotId: string | null;
 
   // ManyToOne (а не OneToOne): за один слот в історії може бути кілька записів
   // (скасовані + один активний). Активність гарантує partial-unique індекс вище.

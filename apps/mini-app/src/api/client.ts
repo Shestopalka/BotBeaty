@@ -60,6 +60,10 @@ export const appointmentsApi = {
   // Майстер записує клієнта сам (телефонний/офлайн запис).
   createByMaster: (data: any) => api.post('/appointments/by-master', data).then(r => r.data),
   delete: (id: string) => api.delete(`/appointments/${id}`).then(r => r.data),
+  reschedule: (id: string, newSlotId: string) =>
+    api.patch(`/appointments/${id}/reschedule`, { newSlotId }).then(r => r.data),
+  swap: (aptA: string, aptB: string) =>
+    api.post('/appointments/swap', { aptA, aptB }).then(r => r.data),
 };
 
 // ─── Slots ────────────────────────────────────────────────────────────────────

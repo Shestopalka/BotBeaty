@@ -106,4 +106,25 @@ export class AppointmentController {
   delete(@Param('id') id: string, @CurrentMasterId() masterId: string) {
     return this.appointmentService.deleteAppointment(id, masterId);
   }
+
+  // Перенести запис на інший вільний слот.
+  @Patch(':id/reschedule')
+  reschedule(
+    @Param('id') id: string,
+    @Body() body: { newSlotId: string },
+    @CurrentMasterId() masterId: string,
+  ) {
+    if (!body?.newSlotId) throw new BadRequestException('Не вказано новий слот');
+    return this.appointmentService.reschedule(id, body.newSlotId, masterId);
+  }
+
+  // Поміняти місцями два записи.
+  @Post('swap')
+  swap(
+    @Body() body: { aptA: string; aptB: string },
+    @CurrentMasterId() masterId: string,
+  ) {
+    if (!body?.aptA || !body?.aptB) throw new BadRequestException('Оберіть два записи');
+    return this.appointmentService.swap(body.aptA, body.aptB, masterId);
+  }
 }

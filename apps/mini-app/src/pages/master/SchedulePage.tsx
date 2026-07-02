@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2 } from 'lucide-react';
+import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2, ArrowLeftRight } from 'lucide-react';
 import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
@@ -15,6 +15,7 @@ interface Appointment {
   status: string;
   pricePaid: number;
   currency: string;
+  slotId?: string | null;
   client: { fullName: string; tag: string; phone?: string | null } | null;
   service: { name: string; durationMinutes: number; priceType?: PriceType; price?: number; priceMax?: number | null } | null;
   slot: { startAt: string; endAt: string } | null;
@@ -42,6 +43,7 @@ export default function SchedulePage() {
   const [showBook, setShowBook] = useState(false);
   const [showCal, setShowCal] = useState(false);
   const [markedDays, setMarkedDays] = useState<Set<string>>(new Set());
+  const [rescheduleApt, setRescheduleApt] = useState<Appointment | null>(null);
 
   function loadMarks() {
     if (!masterId) return;
@@ -194,6 +196,7 @@ export default function SchedulePage() {
             <AppointmentCard key={apt.id} apt={apt} isNew={newIds.has(apt.id)}
               isRemoving={removingApt.has(apt.id)}
               onDelete={() => deleteApt(apt.id)}
+              onReschedule={() => setRescheduleApt(apt)}
               onConfirm={() => updateStatus(apt.id, 'confirmed')}
               onCancel={() => updateStatus(apt.id, 'cancelled_master')}
               onComplete={() => updateStatus(apt.id, 'completed')}
@@ -220,12 +223,21 @@ export default function SchedulePage() {
           onClose={() => setShowCal(false)}
         />
       )}
+
+      {rescheduleApt && (
+        <RescheduleSheet
+          apt={rescheduleApt}
+          masterId={masterId}
+          onClose={() => setRescheduleApt(null)}
+          onDone={() => { setRescheduleApt(null); loadAppointments(false); loadMarks(); }}
+        />
+      )}
     </div>
   );
 }
 
-function AppointmentCard({ apt, isNew, isRemoving, onDelete, onConfirm, onCancel, onComplete, onNoShow }: {
-  apt: Appointment; isNew?: boolean; isRemoving?: boolean; onDelete: () => void; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
+function AppointmentCard({ apt, isNew, isRemoving, onDelete, onReschedule, onConfirm, onCancel, onComplete, onNoShow }: {
+  apt: Appointment; isNew?: boolean; isRemoving?: boolean; onDelete: () => void; onReschedule: () => void; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
 }) {
   const terminal = ['cancelled_client', 'cancelled_master', 'no_show', 'completed'].includes(apt.status);
   const startTime = format(new Date(apt.slot?.startAt ?? Date.now()), 'HH:mm');
@@ -349,6 +361,14 @@ function AppointmentCard({ apt, isNew, isRemoving, onDelete, onConfirm, onCancel
             <X size={16} />
           </button>
         </div>
+      )}
+
+      {(apt.status === 'pending' || apt.status === 'confirmed') && (
+        <button onClick={onReschedule}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium"
+          style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)', border: '1px solid var(--theme-glow-color)' }}>
+          <ArrowLeftRight size={14} /> Перенести / обміняти
+        </button>
       )}
     </div>
   );
@@ -573,6 +593,149 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
             style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
             {submitting ? 'Створюємо…' : 'Записати'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Шторка перенесення запису: на вільний час або обмін місцями з іншим записом. */
+function RescheduleSheet({ apt, masterId, onClose, onDone }: {
+  apt: Appointment; masterId: string; onClose: () => void; onDone: () => void;
+}) {
+  const { hideNav, showNav } = useUI();
+  const [closing, setClosing] = useState(false);
+  const CLOSE_MS = 280;
+  const [mode, setMode] = useState<'slot' | 'swap'>('slot');
+  const today0 = startOfDay(new Date());
+  const startD = apt.slot?.startAt ? startOfDay(new Date(apt.slot.startAt)) : today0;
+  const [date, setDate] = useState(startD.getTime() < today0.getTime() ? today0 : startD);
+  const [slots, setSlots] = useState<SlotLite[]>([]);
+  const [appts, setAppts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { hideNav(); return () => showNav(); }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const from = date.toISOString(); const to = addDays(date, 1).toISOString();
+    if (mode === 'slot') {
+      slotsApi.getForMaster(masterId, from, to)
+        .then((d: SlotLite[]) => setSlots(d.filter(s => !s.isBooked && isSameDay(new Date(s.startAt), date) && s.id !== apt.slotId)))
+        .catch(() => setSlots([])).finally(() => setLoading(false));
+    } else {
+      appointmentsApi.getByMaster(masterId, format(date, 'yyyy-MM-dd'))
+        .then((d: any[]) => setAppts(d.filter(a => (a.status === 'pending' || a.status === 'confirmed') && a.id !== apt.id)))
+        .catch(() => setAppts([])).finally(() => setLoading(false));
+    }
+  }, [mode, date, masterId]);
+
+  const days = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
+  function handleClose() { if (closing) return; setClosing(true); setTimeout(onClose, CLOSE_MS); }
+  function doReschedule(slotId: string) {
+    if (submitting) return; setSubmitting(true);
+    appointmentsApi.reschedule(apt.id, slotId)
+      .then(() => { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); onDone(); })
+      .catch((e) => { setSubmitting(false); showApiError(e, 'Не вдалось перенести запис.'); });
+  }
+  function doSwap(otherId: string) {
+    if (submitting) return; setSubmitting(true);
+    appointmentsApi.swap(apt.id, otherId)
+      .then(() => { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); onDone(); })
+      .catch((e) => { setSubmitting(false); showApiError(e, 'Не вдалось обміняти записи.'); });
+  }
+  const curTime = apt.slot?.startAt ? format(new Date(apt.slot.startAt), 'd MMM · HH:mm', { locale: uk }) : '';
+
+  return (
+    <div className="fixed inset-0" style={{ zIndex: 200 }} onClick={handleClose}>
+      <div className={`${closing ? 'bb-backdrop-out' : 'bb-backdrop'} absolute inset-0 bg-black/40`} />
+      <div className={`${closing ? 'bb-sheet-out' : 'bb-sheet'} absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col`}
+        style={{ background: 'var(--tg-theme-bg-color)', boxShadow: '0 -8px 32px var(--theme-glow-color)', maxHeight: '92vh' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="pt-3 pb-1 flex justify-center flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--tg-theme-secondary-bg-color)' }} />
+        </div>
+        <div className="px-5 pb-2 flex-shrink-0">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>Перенести запис</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
+            {apt.client?.fullName ?? 'Клієнт'} · {apt.service?.name ?? '—'} · {curTime}
+          </p>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 pb-2 min-h-0 space-y-4">
+          {/* Режим */}
+          <div className="flex gap-2">
+            {([['slot', 'На вільний час'], ['swap', 'Обмін місцями']] as const).map(([val, lbl]) => (
+              <button key={val} onClick={() => setMode(val)}
+                className="flex-1 py-2 rounded-xl text-sm font-medium"
+                style={mode === val
+                  ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                  : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+
+          {/* Дата */}
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
+            {days.map(d => {
+              const sel = isSameDay(d, date);
+              return (
+                <button key={d.toISOString()} onClick={() => setDate(d)}
+                  className="flex flex-col items-center min-w-[46px] flex-shrink-0 py-2 px-1 rounded-xl"
+                  style={sel
+                    ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
+                    : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+                  <span className="text-[10px] opacity-70">{format(d, 'EEE', { locale: uk })}</span>
+                  <span className="text-base font-bold">{format(d, 'd')}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {loading ? (
+            <p className="text-sm py-4 text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>Завантаження…</p>
+          ) : mode === 'slot' ? (
+            slots.length === 0 ? (
+              <p className="text-sm py-4 text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>Немає вільних слотів на цей день.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {slots.map(s => (
+                  <button key={s.id} onClick={() => doReschedule(s.id)} disabled={submitting}
+                    className="py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
+                    style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+                    {format(new Date(s.startAt), 'HH:mm')}
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            appts.length === 0 ? (
+              <p className="text-sm py-4 text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>Немає інших активних записів на цей день.</p>
+            ) : (
+              <div className="space-y-2">
+                {appts.map(a => (
+                  <button key={a.id} onClick={() => doSwap(a.id)} disabled={submitting}
+                    className="w-full flex items-center justify-between p-3 rounded-xl text-left disabled:opacity-50"
+                    style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+                    <span className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>
+                      {a.client?.fullName ?? 'Клієнт'} · {a.service?.name ?? '—'}
+                    </span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
+                      {a.slot?.startAt ? format(new Date(a.slot.startAt), 'HH:mm') : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="px-5 pt-2 flex-shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+          <p className="text-xs text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>
+            {mode === 'slot' ? 'Оберіть вільний час — клієнт отримає сповіщення' : 'Оберіть запис для обміну — обидва клієнти отримають сповіщення'}
+          </p>
         </div>
       </div>
     </div>
