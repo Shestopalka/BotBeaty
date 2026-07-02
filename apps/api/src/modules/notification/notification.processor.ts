@@ -135,19 +135,25 @@ export class NotificationProcessor extends WorkerHost {
       }
     }
 
-    // Клієнт скасував — повідомляємо МАЙСТРА (слот звільнився).
-    if (data.newStatus === AppointmentStatus.CANCELLED_CLIENT && apt.master) {
+    // Будь-яке скасування — повідомляємо МАЙСТРА в його чат (слот звільнився).
+    // CANCELLED_CLIENT — скасував клієнт; CANCELLED_MASTER — сам майстер у кабінеті,
+    // але він теж хоче бачити підтвердження в чаті з ботом.
+    const isCancel =
+      data.newStatus === AppointmentStatus.CANCELLED_CLIENT ||
+      data.newStatus === AppointmentStatus.CANCELLED_MASTER;
+    if (isCancel && apt.master) {
       const time = apt.slot?.startAt
         ? new Date(apt.slot.startAt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' })
         : '';
+      const who = data.newStatus === AppointmentStatus.CANCELLED_CLIENT ? 'Клієнт скасував запис' : 'Запис скасовано';
       try {
         await this.botService.sendToMaster(
           apt.master,
-          `❌ <b>Клієнт скасував запис</b>\n👤 ${apt.client?.fullName ?? '—'}\n💅 ${apt.service?.name ?? '—'}\n📅 ${time}`,
+          `❌ <b>${who}</b>\n👤 ${apt.client?.fullName ?? '—'}\n💅 ${apt.service?.name ?? '—'}\n📅 ${time}`,
           { parse_mode: 'HTML' },
         );
       } catch (e) {
-        this.logger.warn(`sendToMaster (client cancel) failed: ${e.message}`);
+        this.logger.warn(`sendToMaster (cancel) failed: ${e.message}`);
       }
     }
   }
