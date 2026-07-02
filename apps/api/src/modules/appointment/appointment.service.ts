@@ -93,20 +93,23 @@ export class AppointmentService {
       });
 
       const phone = dto.clientPhone?.trim() || undefined;
+      const name = dto.clientName?.trim() || undefined;
 
       if (!client) {
         client = manager.getRepository(Client).create({
           telegramId: dto.clientTelegramId,
-          fullName: dto.clientName,
+          fullName: name || 'Клієнт',
           masterId: dto.masterId,
           phone,
           tag: ClientTag.NEW,
         });
         await manager.getRepository(Client).save(client);
-      } else if (phone && client.phone !== phone) {
-        // Оновлюємо номер, якщо клієнт вказав новий/інший.
-        client.phone = phone;
-        await manager.getRepository(Client).save(client);
+      } else {
+        // Оновлюємо імʼя/номер, якщо клієнт вказав нові при записі.
+        let changed = false;
+        if (name && client.fullName !== name) { client.fullName = name; changed = true; }
+        if (phone && client.phone !== phone) { client.phone = phone; changed = true; }
+        if (changed) await manager.getRepository(Client).save(client);
       }
 
       // Блокований клієнт не може записатись

@@ -44,11 +44,14 @@ export default function BookingPage() {
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [phone, setPhone] = useState('');
+  const [clientName, setClientName] = useState(() =>
+    user ? `${user.first_name} ${user.last_name ?? ''}`.trim() : '');
   const [nextSlot, setNextSlot] = useState<string | null | undefined>(undefined);
 
   // Валідний український номер: 10–13 цифр (можна з +).
   const phoneDigits = phone.replace(/\D/g, '');
   const phoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 13;
+  const nameValid = clientName.trim().length >= 2;
 
   const tg = window.Telegram?.WebApp;
 
@@ -140,15 +143,12 @@ export default function BookingPage() {
     }
     // user може бути null у dev режимі — використовуємо fallback
     const clientTelegramId = String(user?.id ?? 0);
-    const clientName = user
-      ? `${user.first_name} ${user.last_name ?? ''}`.trim()
-      : 'Test Client';
     setBooking(true);
     try {
       const created = await appointmentsApi.create({
         masterId,
         clientTelegramId,
-        clientName,
+        clientName: clientName.trim(),
         serviceId: selectedService.id,
         slotId: selectedSlot.id,
         clientPhone: phone.trim(),
@@ -453,6 +453,26 @@ export default function BookingPage() {
             </div>
           </div>
 
+          {/* Імʼя та прізвище — щоб майстер бачив, хто записався */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
+              Ваше імʼя та прізвище
+            </label>
+            <input
+              type="text"
+              autoComplete="name"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Олена Коваль"
+              className="w-full px-4 py-3 rounded-2xl text-base outline-none"
+              style={{
+                background: 'var(--tg-theme-bg-color)',
+                color: 'var(--tg-theme-text-color)',
+                border: '1.5px solid var(--theme-glow-color, var(--tg-theme-hint-color))',
+              }}
+            />
+          </div>
+
           {/* Номер телефону — щоб майстер міг зателефонувати, якщо не вийде в Telegram */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
@@ -479,7 +499,7 @@ export default function BookingPage() {
 
           <button
             onClick={confirmBooking}
-            disabled={booking || !phoneValid}
+            disabled={booking || !phoneValid || !nameValid}
             className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50"
             style={{ background: 'var(--tg-theme-button-color)' }}
           >

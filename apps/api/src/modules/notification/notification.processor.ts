@@ -118,6 +118,7 @@ export class NotificationProcessor extends WorkerHost {
     const statusMessages: Record<string, string> = {
       [AppointmentStatus.CONFIRMED]: '✅ Ваш запис підтверджено майстром!',
       [AppointmentStatus.CANCELLED_MASTER]: '❌ На жаль, майстер скасував запис. Оберіть інший час.',
+      [AppointmentStatus.CANCELLED_CLIENT]: '❌ Ви скасували запис. Будемо раді бачити вас знову!',
       [AppointmentStatus.COMPLETED]: '🌟 Дякуємо за візит! Будемо раді бачити вас знову.',
     };
 
