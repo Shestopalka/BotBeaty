@@ -14,7 +14,6 @@ interface Slot {
   isBooked: boolean;
 }
 
-const WORK_TIMES = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
 const DURATIONS = [30, 45, 60, 90, 120];
 const STRIP_DAYS = 60;
 
@@ -555,19 +554,16 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
               <p className="text-xs mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>Початок</p>
-              <select value={startTime} onChange={e => setStartTime(e.target.value)}
+              {/* Нативний time-picker: можна обрати з точністю до хвилин (крок 5 хв) */}
+              <input type="time" step={300} value={startTime} onChange={e => setStartTime(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
-                {WORK_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+                style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }} />
             </div>
             <div className="flex-1">
               <p className="text-xs mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>Кінець</p>
-              <select value={endTime} onChange={e => setEndTime(e.target.value)}
+              <input type="time" step={300} value={endTime} onChange={e => setEndTime(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
-                {WORK_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+                style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }} />
             </div>
           </div>
 
