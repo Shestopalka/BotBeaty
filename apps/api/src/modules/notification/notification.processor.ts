@@ -164,18 +164,37 @@ export class NotificationProcessor extends WorkerHost {
     appointmentId: string;
     oldTime: string;
     newTime: string;
+    clientTelegramId?: string | null;
+    serviceName?: string | null;
   }) {
-    const apt = await this.appointmentRepo.findOne({
-      where: { id: data.appointmentId },
-      relations: ['client', 'service'],
-    });
-    if (!apt?.client?.telegramId) return;
+    // Дані клієнта/послуги приходять прямо в задачі (заповнюються після коміту
+    // транзакції). Фолбек — довантажуємо з БД, якщо задачу створено старим кодом.
+    let clientTelegramId = data.clientTelegramId ?? null;
+    let serviceName = data.serviceName ?? null;
+    let masterId: string | null = null;
+
+    if (!clientTelegramId || !serviceName) {
+      const apt = await this.appointmentRepo.findOne({
+        where: { id: data.appointmentId },
+        relations: ['client', 'service'],
+      });
+      clientTelegramId = clientTelegramId ?? apt?.client?.telegramId ?? null;
+      serviceName = serviceName ?? apt?.service?.name ?? null;
+      masterId = apt?.masterId ?? null;
+    }
+
+    if (!masterId) {
+      const apt = await this.appointmentRepo.findOne({ where: { id: data.appointmentId } });
+      masterId = apt?.masterId ?? null;
+    }
+    if (!clientTelegramId || !masterId) return;
+
     try {
       await this.botService.sendToClient(
-        apt.masterId,
-        apt.client.telegramId,
+        masterId,
+        clientTelegramId,
         `🔄 <b>Ваш запис перенесено</b>\n` +
-        `💅 ${apt.service?.name ?? '—'}\n` +
+        `💅 ${serviceName ?? '—'}\n` +
         (data.oldTime ? `Було: ${data.oldTime}\n` : '') +
         `Стало: <b>${data.newTime}</b>`,
         { parse_mode: 'HTML' },

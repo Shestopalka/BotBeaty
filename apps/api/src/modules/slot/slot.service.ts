@@ -79,22 +79,59 @@ export class SlotService {
 
     if (!slots.length) throw new BadRequestException('Не вдалось згенерувати слоти');
 
-    // INSERT ... ON CONFLICT DO NOTHING — ігноруємо дублікати по (masterId, startAt).
-    // Unique-індекс тепер ЧАСТКОВИЙ (WHERE deletedAt IS NULL), тож раніше soft-deleted
-    // слоти НЕ конфліктують — прибирати їх вручну більше не треба.
-    const startTimes = slots.map(s => s.startAt!);
+    // ── Захист від ПЕРЕТИНІВ ─────────────────────────────────────────────
+    // Не можна створювати слоти, що накладаються на наявні активні слоти
+    // (напр. 10:00–11:00 і 10:10–12:00). Unique-індекс ловить лише однаковий
+    // старт, а не перетин діапазонів — тож перевіряємо вручну.
+    const overlaps = (aS: number, aE: number, bS: number, bE: number) => aS < bE && bS < aE;
+    const minStart = new Date(Math.min(...slots.map(s => s.startAt!.getTime())));
+    const maxEnd = new Date(Math.max(...slots.map(s => s.endAt!.getTime())));
+    const existing = await this.slotRepo.createQueryBuilder('s')
+      .where('s.masterId = :m', { m: dto.masterId })
+      .andWhere('s.deletedAt IS NULL')
+      .andWhere('s."startAt" < :maxEnd AND s."endAt" > :minStart', { maxEnd, minStart })
+      .getMany();
+
+    const toInsert: Partial<Slot>[] = [];
+    let partialConflict = false;
+    for (const g of slots) {
+      const gs = g.startAt!.getTime(), ge = g.endAt!.getTime();
+      const ex = existing.find(e =>
+        overlaps(gs, ge, new Date(e.startAt).getTime(), new Date(e.endAt).getTime()));
+      if (ex) {
+        // Точний дубль за часом старту — просто пропускаємо (вже існує).
+        // Частковий перетин — це конфлікт, який треба показати майстру.
+        if (new Date(ex.startAt).getTime() !== gs) partialConflict = true;
+        continue;
+      }
+      // Перетин із уже відібраними в цьому ж батчі.
+      if (toInsert.some(t => overlaps(gs, ge, t.startAt!.getTime(), t.endAt!.getTime()))) {
+        partialConflict = true; continue;
+      }
+      toInsert.push(g);
+    }
+
+    if (!toInsert.length) {
+      if (partialConflict) {
+        throw new BadRequestException('Обраний час перетинається з наявними слотами.');
+      }
+      // Усе — точні дублікати: нічого нового не додаємо, повертаємо наявні.
+      return this.slotRepo.find({
+        where: slots.map(s => ({ masterId: dto.masterId, startAt: s.startAt! })),
+        order: { startAt: 'ASC' },
+      });
+    }
 
     await this.slotRepo
       .createQueryBuilder()
       .insert()
       .into(Slot)
-      .values(slots)
-      .orIgnore() // конфлікт лише з активними/заброньованими слотами — їх не дублюємо
+      .values(toInsert)
+      .orIgnore() // на випадок гонки — не дублюємо по однаковому старту
       .execute();
 
-    // Повертаємо всі активні слоти на ці часи
     return this.slotRepo.find({
-      where: startTimes.map(startAt => ({ masterId: dto.masterId, startAt })),
+      where: slots.map(s => ({ masterId: dto.masterId, startAt: s.startAt! })),
       order: { startAt: 'ASC' },
     });
   }

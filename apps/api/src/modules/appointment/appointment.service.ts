@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   NotFoundException,
   ConflictException,
@@ -37,6 +38,8 @@ export interface CreateByMasterDto {
 
 @Injectable()
 export class AppointmentService {
+  private readonly logger = new Logger(AppointmentService.name);
+
   constructor(
     @InjectRepository(Appointment)
     private appointmentRepo: Repository<Appointment>,
@@ -478,15 +481,15 @@ export class AppointmentService {
   async reschedule(appointmentId: string, newSlotId: string, masterId: string): Promise<Appointment> {
     const fmt = (dt: any) =>
       new Date(dt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' });
-    return await this.dataSource.transaction(async (m) => {
+    const { saved, notify } = await this.dataSource.transaction(async (m) => {
       const apt = await m.getRepository(Appointment).findOne({
-        where: { id: appointmentId, masterId }, relations: ['slot'],
+        where: { id: appointmentId, masterId }, relations: ['slot', 'client', 'service'],
       });
       if (!apt) throw new NotFoundException('Запис не знайдено');
       if (apt.status !== AppointmentStatus.PENDING && apt.status !== AppointmentStatus.CONFIRMED) {
         throw new BadRequestException('Переносити можна лише активні записи');
       }
-      if (apt.slotId === newSlotId) return apt;
+      if (apt.slotId === newSlotId) return { saved: apt, notify: null };
 
       const newSlot = await m.getRepository(Slot).createQueryBuilder('s')
         .setLock('pessimistic_write')
@@ -509,11 +512,25 @@ export class AppointmentService {
         changedBy: masterId, changedByType: 'master',
       });
 
-      await this.notificationsQueue.add('appointment_rescheduled', {
-        appointmentId: saved.id, oldTime, newTime: fmt(newSlot.startAt),
-      }).catch(() => {});
-      return saved;
+      return {
+        saved,
+        notify: {
+          appointmentId: saved.id,
+          clientTelegramId: apt.client?.telegramId ?? null,
+          serviceName: apt.service?.name ?? null,
+          oldTime,
+          newTime: fmt(newSlot.startAt),
+        },
+      };
     });
+
+    // Нотифікацію ставимо в чергу ПІСЛЯ коміту — щоб воркер напевно бачив
+    // зафіксовані дані та ми не ловили гонку "job виконався до commit".
+    if (notify) {
+      await this.notificationsQueue.add('appointment_rescheduled', notify).catch((e) =>
+        this.logger?.warn?.(`enqueue reschedule notify failed: ${e?.message}`));
+    }
+    return saved;
   }
 
   /**
@@ -524,9 +541,9 @@ export class AppointmentService {
     const fmt = (dt: any) =>
       new Date(dt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' });
     if (aptAId === aptBId) throw new BadRequestException('Оберіть два різні записи');
-    return await this.dataSource.transaction(async (m) => {
-      const A = await m.getRepository(Appointment).findOne({ where: { id: aptAId, masterId }, relations: ['slot'] });
-      const B = await m.getRepository(Appointment).findOne({ where: { id: aptBId, masterId }, relations: ['slot'] });
+    const notifs = await this.dataSource.transaction(async (m) => {
+      const A = await m.getRepository(Appointment).findOne({ where: { id: aptAId, masterId }, relations: ['slot', 'client', 'service'] });
+      const B = await m.getRepository(Appointment).findOne({ where: { id: aptBId, masterId }, relations: ['slot', 'client', 'service'] });
       if (!A || !B) throw new NotFoundException('Запис не знайдено');
       const active = (s: AppointmentStatus) => s === AppointmentStatus.PENDING || s === AppointmentStatus.CONFIRMED;
       if (!active(A.status) || !active(B.status)) throw new BadRequestException('Міняти місцями можна лише активні записи');
@@ -545,10 +562,18 @@ export class AppointmentService {
           oldData: { swap: true }, newData: { swap: true }, changedBy: masterId, changedByType: 'master',
         });
       }
-      await this.notificationsQueue.add('appointment_rescheduled', { appointmentId: A.id, oldTime: timeA, newTime: timeB }).catch(() => {});
-      await this.notificationsQueue.add('appointment_rescheduled', { appointmentId: B.id, oldTime: timeB, newTime: timeA }).catch(() => {});
-      return { swapped: true };
+      return [
+        { appointmentId: A.id, clientTelegramId: A.client?.telegramId ?? null, serviceName: A.service?.name ?? null, oldTime: timeA, newTime: timeB },
+        { appointmentId: B.id, clientTelegramId: B.client?.telegramId ?? null, serviceName: B.service?.name ?? null, oldTime: timeB, newTime: timeA },
+      ];
     });
+
+    // Нотифікації — після коміту транзакції.
+    for (const n of notifs) {
+      await this.notificationsQueue.add('appointment_rescheduled', n).catch((e) =>
+        this.logger?.warn?.(`enqueue swap notify failed: ${e?.message}`));
+    }
+    return { swapped: true };
   }
 
   /**
