@@ -498,13 +498,31 @@ export class AppointmentService {
         .andWhere('s.deletedAt IS NULL')
         .getOne();
       if (!newSlot) throw new NotFoundException('Слот не знайдено');
-      if (newSlot.isBooked) throw new ConflictException('Цей час уже зайнятий');
+      if (newSlot.isBooked) {
+        // Слот позначено зайнятим — але, можливо, це «осиротілий» слот без
+        // активного запису (наслідок старих багів). Перевіряємо реальну
+        // зайнятість: якщо активного запису нема — вважаємо слот вільним.
+        const activeOnSlot = await m.getRepository(Appointment).count({
+          where: [
+            { slotId: newSlot.id, status: AppointmentStatus.PENDING },
+            { slotId: newSlot.id, status: AppointmentStatus.CONFIRMED },
+            { slotId: newSlot.id, status: AppointmentStatus.COMPLETED },
+          ],
+        });
+        if (activeOnSlot > 0) throw new ConflictException('Цей час уже зайнятий');
+      }
 
       const oldTime = apt.slot?.startAt ? fmt(apt.slot.startAt) : '';
       if (apt.slotId) await m.getRepository(Slot).update(apt.slotId, { isBooked: false });
       await m.getRepository(Slot).update(newSlot.id, { isBooked: true });
+      // ВАЖЛИВО: оновлюємо ЛИШЕ FK-колонку через update(), а не save(apt).
+      // Через save() завантажена реляція apt.slot (старий слот) перебиває
+      // apt.slotId і TypeORM пише назад старий slotId — запис лишається на
+      // старому слоті, а новий стає «осиротілим» (isBooked=true без запису).
+      await m.getRepository(Appointment).update(apt.id, { slotId: newSlot.id });
       apt.slotId = newSlot.id;
-      const saved = await m.getRepository(Appointment).save(apt);
+      apt.slot = newSlot;
+      const saved = apt;
 
       await m.getRepository(AuditLog).save({
         tableName: 'appointments', recordId: saved.id, action: AuditAction.UPDATE,
