@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Client, ClientTag } from '../../database/entities/client.entity';
@@ -39,6 +39,37 @@ export class ClientService {
     });
     if (!client) throw new NotFoundException('Клієнта не знайдено');
     client.notes = notes;
+    return this.clientRepo.save(client);
+  }
+
+  /**
+   * Редагування картки клієнта майстром: ім'я/прізвище (fullName) та телефон.
+   * Приймаємо лише дозволені поля. fullName — обов'язково непорожнє.
+   */
+  async updateProfile(
+    clientId: string,
+    masterId: string,
+    data: { fullName?: string; phone?: string },
+  ): Promise<Client> {
+    const client = await this.clientRepo.findOne({
+      where: { id: clientId, masterId },
+    });
+    if (!client) throw new NotFoundException('Клієнта не знайдено');
+
+    if (data.fullName !== undefined) {
+      const name = (data.fullName ?? '').trim().replace(/\s+/g, ' ');
+      if (!name) throw new BadRequestException("Ім'я не може бути порожнім");
+      if (name.length > 120) throw new BadRequestException("Занадто довге ім'я");
+      client.fullName = name;
+    }
+
+    if (data.phone !== undefined) {
+      const phone = (data.phone ?? '').trim();
+      if (phone.length > 32) throw new BadRequestException('Занадто довгий номер');
+      // Порожній рядок → очищаємо номер (null-подібно, колонка nullable).
+      client.phone = phone || (null as any);
+    }
+
     return this.clientRepo.save(client);
   }
 

@@ -35,6 +35,19 @@ export class ClientController {
     return this.clientService.updateNotes(id, masterId, body.notes);
   }
 
+  // Редагування картки клієнта (ім'я/прізвище + телефон).
+  @Patch(':id')
+  updateProfile(
+    @Param('id') id: string,
+    @CurrentMasterId() masterId: string,
+    @Body() body: { fullName?: string; phone?: string },
+  ) {
+    return this.clientService.updateProfile(id, masterId, {
+      fullName: body?.fullName,
+      phone: body?.phone,
+    });
+  }
+
   @Post(':id/block')
   block(@Param('id') id: string, @CurrentMasterId() masterId: string) {
     return this.clientService.block(id, masterId);

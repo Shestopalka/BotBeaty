@@ -87,6 +87,18 @@ export const analyticsApi = {
     api.get(`/analytics/master/${masterId}`).then(r => r.data),
 };
 
+// ─── Expenses (журнал витрат) ──────────────────────────────────────────────────
+export const expensesApi = {
+  list: (from: string, to: string) =>
+    api.get('/expenses', { params: { from, to } }).then(r => r.data),
+  create: (data: { amount: number; description?: string; spentAt?: string }) =>
+    api.post('/expenses', data).then(r => r.data),
+  update: (id: string, data: { amount?: number; description?: string; spentAt?: string }) =>
+    api.patch(`/expenses/${id}`, data).then(r => r.data),
+  delete: (id: string) =>
+    api.delete(`/expenses/${id}`).then(r => r.data),
+};
+
 // ─── Clients ──────────────────────────────────────────────────────────────────
 export const clientsApi = {
   getByMaster: (masterId: string, tag?: string) =>
@@ -95,6 +107,9 @@ export const clientsApi = {
     api.patch(`/clients/${id}/tag`, { masterId, tag }).then(r => r.data),
   updateNotes: (id: string, masterId: string, notes: string) =>
     api.patch(`/clients/${id}/notes`, { masterId, notes }).then(r => r.data),
+  // Редагування картки: ім'я/прізвище + телефон.
+  update: (id: string, masterId: string, data: { fullName?: string; phone?: string }) =>
+    api.patch(`/clients/${id}`, { masterId, ...data }).then(r => r.data),
   block: (id: string, masterId: string) =>
     api.post(`/clients/${id}/block`, { masterId }).then(r => r.data),
   delete: (id: string, masterId: string) =>

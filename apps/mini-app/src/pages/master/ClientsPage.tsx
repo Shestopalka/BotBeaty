@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useUI } from '../../context/UIContext';
-import { Search, MoreVertical, Users, FileText, Phone } from 'lucide-react';
+import { Search, MoreVertical, Users, FileText, Phone, Pencil } from 'lucide-react';
 import { clientsApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { Illustration } from '../../components/Illustration';
@@ -82,6 +82,13 @@ export default function ClientsPage() {
 
   async function saveNotes(clientId: string, notes: string) {
     await clientsApi.updateNotes(clientId, masterId, notes);
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+    setSelected(null);
+    loadClients();
+  }
+
+  async function saveProfile(clientId: string, data: { fullName: string; phone: string }) {
+    await clientsApi.update(clientId, masterId, data);
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
     setSelected(null);
     loadClients();
@@ -200,6 +207,7 @@ export default function ClientsPage() {
           onClose={() => setSelected(null)}
           onTagChange={tag => changeTag(selected.id, tag)}
           onSaveNotes={notes => saveNotes(selected.id, notes)}
+          onSaveProfile={data => saveProfile(selected.id, data)}
           onDelete={() => deleteClient(selected.id)}
         />
       )}
@@ -207,9 +215,10 @@ export default function ClientsPage() {
   );
 }
 
-function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes, onDelete }: {
+function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes, onSaveProfile, onDelete }: {
   client: Client; masterId: string; onClose: () => void;
   onTagChange: (tag: string) => void; onSaveNotes: (notes: string) => void;
+  onSaveProfile: (data: { fullName: string; phone: string }) => void;
   onDelete: () => void;
 }) {
   const { hideNav, showNav } = useUI();
@@ -217,6 +226,12 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
   const [notes, setNotes] = useState(client.notes ?? '');
   const [savingNotes, setSavingNotes] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  // Редагування картки. fullName ділимо на ім'я (перше слово) + прізвище (решта).
+  const [firstName, setFirstName] = useState((client.fullName ?? '').trim().split(/\s+/)[0] ?? '');
+  const [lastName, setLastName] = useState((client.fullName ?? '').trim().split(/\s+/).slice(1).join(' '));
+  const [phone, setPhone] = useState(client.phone ?? '');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const CLOSE_MS = 280;
 
@@ -247,6 +262,22 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
     }
   }
 
+  const fullNameDraft = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+
+  async function handleSaveProfile() {
+    if (!fullNameDraft) {
+      (window.Telegram?.WebApp as any)?.showAlert?.("Вкажіть ім'я клієнта");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await onSaveProfile({ fullName: fullNameDraft, phone: phone.trim() });
+    } catch {
+      setSavingProfile(false);
+      (window.Telegram?.WebApp as any)?.showAlert?.('Не вдалось зберегти дані');
+    }
+  }
+
   const actions = [
     { tag: 'regular', label: '⭐ Позначити постійним' },
     { tag: 'trusted', label: '◆ Позначити перевіреним' },
@@ -274,7 +305,7 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
               style={{ background: 'var(--theme-pill-bg)', color: 'var(--tg-theme-button-color)' }}>
-              {client.fullName[0].toUpperCase()}
+              {(client.fullName?.[0] ?? '?').toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-base truncate" style={{ color: 'var(--tg-theme-text-color)' }}>
@@ -294,6 +325,67 @@ function ClientActionSheet({ client, masterId, onClose, onTagChange, onSaveNotes
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Редагування даних клієнта: ім'я, прізвище, телефон */}
+          <div className="mb-3">
+            <button
+              onClick={() => setShowEdit(v => !v)}
+              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl text-sm font-medium text-left"
+              style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
+              <Pencil size={16} style={{ color: 'var(--tg-theme-button-color)' }} />
+              <span className="flex-1">Редагувати дані</span>
+            </button>
+
+            {showEdit && (
+              <div className="mt-2 space-y-2">
+                <input
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  placeholder="Ім'я"
+                  className="w-full px-4 py-3 rounded-2xl text-sm outline-none"
+                  style={{
+                    background: 'var(--tg-theme-secondary-bg-color)',
+                    color: 'var(--tg-theme-text-color)',
+                    border: '1.5px solid var(--tg-theme-button-color)44',
+                  }}
+                />
+                <input
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  placeholder="Прізвище"
+                  className="w-full px-4 py-3 rounded-2xl text-sm outline-none"
+                  style={{
+                    background: 'var(--tg-theme-secondary-bg-color)',
+                    color: 'var(--tg-theme-text-color)',
+                    border: '1.5px solid var(--tg-theme-button-color)44',
+                  }}
+                />
+                <input
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="Номер телефону"
+                  inputMode="tel"
+                  className="w-full px-4 py-3 rounded-2xl text-sm outline-none"
+                  style={{
+                    background: 'var(--tg-theme-secondary-bg-color)',
+                    color: 'var(--tg-theme-text-color)',
+                    border: '1.5px solid var(--tg-theme-button-color)44',
+                  }}
+                />
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile || !fullNameDraft}
+                  className="w-full py-3 rounded-2xl text-sm font-semibold transition-opacity disabled:opacity-50"
+                  style={{
+                    background: 'var(--tg-theme-button-color)',
+                    color: 'var(--tg-theme-button-text-color)',
+                    boxShadow: 'var(--theme-btn-shadow)',
+                  }}>
+                  {savingProfile ? 'Зберігаємо...' : 'Зберегти дані'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Телефон — щоб майстер міг зателефонувати */}

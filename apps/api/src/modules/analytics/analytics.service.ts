@@ -4,10 +4,13 @@ import { Repository } from 'typeorm';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { Client, ClientTag } from '../../database/entities/client.entity';
+import { Expense } from '../../database/entities/expense.entity';
 
 export interface DashboardStats {
   // Поточний місяць
   revenueThisMonth: number;
+  expensesThisMonth: number;   // Витрати (журнал витрат)
+  netIncomeThisMonth: number;  // Чистий дохід = дохід − витрати
   appointmentsThisMonth: number;
   newClientsThisMonth: number;
   completionRate: number; // % завершених від підтверджених
@@ -35,6 +38,8 @@ export class AnalyticsService {
     private paymentRepo: Repository<Payment>,
     @InjectRepository(Client)
     private clientRepo: Repository<Client>,
+    @InjectRepository(Expense)
+    private expenseRepo: Repository<Expense>,
   ) {}
 
   async getDashboard(masterId: string): Promise<DashboardStats> {
@@ -52,12 +57,14 @@ export class AnalyticsService {
       topServices,
       revenueByDay,
       clientsByTag,
+      expensesThisMonth,
     ] = await Promise.all([
       this.getMonthStats(masterId, thisMonthStart, thisMonthEnd),
       this.getMonthStats(masterId, lastMonthStart, lastMonthEnd),
       this.getTopServices(masterId, thisMonthStart, now),
       this.getRevenueByDay(masterId, last30days, now),
       this.getClientsByTag(masterId),
+      this.getExpensesSum(masterId, thisMonthStart, thisMonthEnd),
     ]);
 
     const revenueGrowth = lastMonthStats.revenue > 0
@@ -74,6 +81,8 @@ export class AnalyticsService {
 
     return {
       revenueThisMonth: thisMonthStats.revenue,
+      expensesThisMonth,
+      netIncomeThisMonth: Math.round((thisMonthStats.revenue - expensesThisMonth) * 100) / 100,
       appointmentsThisMonth: thisMonthStats.total,
       newClientsThisMonth: thisMonthStats.newClients,
       completionRate,
@@ -157,6 +166,18 @@ export class AnalyticsService {
       revenue: parseFloat(r.revenue ?? '0'),
       count: parseInt(r.count),
     }));
+  }
+
+  /** Сума витрат майстра за період (журнал витрат). */
+  private async getExpensesSum(masterId: string, from: Date, to: Date): Promise<number> {
+    const r = await this.expenseRepo
+      .createQueryBuilder('e')
+      .select('COALESCE(SUM(e.amount), 0)', 'sum')
+      .where('e.masterId = :masterId', { masterId })
+      .andWhere('e.spentAt BETWEEN :from AND :to', { from, to })
+      .andWhere('e.deletedAt IS NULL')
+      .getRawOne();
+    return parseFloat(r?.sum ?? '0');
   }
 
   private async getClientsByTag(masterId: string) {

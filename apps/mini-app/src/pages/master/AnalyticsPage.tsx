@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { TrendingUp, TrendingDown, Users, Award } from 'lucide-react';
-import { analyticsApi } from '../../api/client';
+import { TrendingUp, TrendingDown, Users, Award, Wallet, Plus, Trash2, ChevronRight } from 'lucide-react';
+import { analyticsApi, expensesApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
+import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
 
 function EmptyHint({ icon, text }: { icon: 'services' | 'clients' | 'calendar'; text: string }) {
@@ -17,6 +18,8 @@ function EmptyHint({ icon, text }: { icon: 'services' | 'clients' | 'calendar'; 
 
 interface DashboardStats {
   revenueThisMonth: number;
+  expensesThisMonth: number;
+  netIncomeThisMonth: number;
   appointmentsThisMonth: number;
   newClientsThisMonth: number;
   completionRate: number;
@@ -25,6 +28,31 @@ interface DashboardStats {
   topServices: { name: string; count: number; revenue: number }[];
   revenueByDay: { date: string; revenue: number; count: number }[];
   clientsByTag: { tag: string; count: number }[];
+}
+
+interface Expense {
+  id: string;
+  amount: number;
+  description: string | null;
+  spentAt: string;
+}
+
+// Межі поточного місяця (ISO) — для журналу витрат і синхронізації з бекендом.
+function monthRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function fmtMoney(n: number): string {
+  return `${Math.round(n).toLocaleString('uk-UA')} ₴`;
+}
+
+function fmtExpenseDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short' });
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -105,8 +133,16 @@ function RevenueChart({ data }: { data: { date: string; revenue: number }[] }) {
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showExpenses, setShowExpenses] = useState(false);
   const { master } = useMaster();
   const masterId = master?.id ?? '';
+
+  function reloadDashboard() {
+    if (!masterId) return;
+    analyticsApi.getDashboard(masterId)
+      .then(setStats)
+      .catch(() => setStats(getMockStats()));
+  }
 
   useEffect(() => {
     analyticsApi.getDashboard(masterId)
@@ -152,6 +188,34 @@ export default function AnalyticsPage() {
           value={`${s.completionRate}%`}
           sub="від підтверджених"
         />
+      </div>
+
+      {/* Витрати + Чистий дохід */}
+      <div className="px-4 grid grid-cols-2 gap-3 mb-4">
+        <button
+          onClick={() => setShowExpenses(true)}
+          className="rounded-2xl p-4 text-left transition-transform active:scale-95"
+          style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+          <div className="flex justify-between items-start mb-1">
+            <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>Витрати</p>
+            <ChevronRight size={14} style={{ color: 'var(--tg-theme-hint-color)' }} />
+          </div>
+          <p className="text-2xl font-bold" style={{ color: '#e05c5c' }}>
+            {fmtMoney(s.expensesThisMonth)}
+          </p>
+          <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--tg-theme-button-color)' }}>
+            Керувати →
+          </p>
+        </button>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+          <p className="text-xs mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>Чистий дохід</p>
+          <p className="text-2xl font-bold" style={{ color: s.netIncomeThisMonth >= 0 ? '#3a9d5d' : '#e05c5c' }}>
+            {fmtMoney(s.netIncomeThisMonth)}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
+            дохід − витрати
+          </p>
+        </div>
       </div>
 
       {/* Графік доходу */}
@@ -218,6 +282,193 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      {showExpenses && (
+        <ExpenseSheet
+          onClose={() => setShowExpenses(false)}
+          onChanged={reloadDashboard}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Журнал витрат ──────────────────────────────────────────────────────────
+function ExpenseSheet({ onClose, onChanged }: {
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { hideNav, showNav } = useUI();
+  const [closing, setClosing] = useState(false);
+  const [items, setItems] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState('');
+  const [desc, setDesc] = useState('');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const CLOSE_MS = 280;
+
+  useEffect(() => {
+    hideNav();
+    load();
+    return () => showNav();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { from, to } = monthRange();
+      setItems(await expensesApi.list(from, to));
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleClose() {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, CLOSE_MS);
+  }
+
+  async function addExpense() {
+    const value = parseFloat(amount.replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0) {
+      (window.Telegram?.WebApp as any)?.showAlert?.('Вкажіть коректну суму');
+      return;
+    }
+    setSaving(true);
+    try {
+      // spentAt — обраний день о 12:00 (щоб не було зсуву у крайні дні місяця).
+      const spentAt = new Date(`${date}T12:00:00`).toISOString();
+      await expensesApi.create({ amount: value, description: desc.trim() || undefined, spentAt });
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+      setAmount('');
+      setDesc('');
+      await load();
+      onChanged();
+    } catch {
+      (window.Telegram?.WebApp as any)?.showAlert?.('Не вдалось додати витрату');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function removeExpense(id: string) {
+    const doDelete = () => {
+      expensesApi.delete(id)
+        .then(async () => {
+          window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+          setItems(prev => prev.filter(e => e.id !== id));
+          onChanged();
+        })
+        .catch(() => (window.Telegram?.WebApp as any)?.showAlert?.('Не вдалось видалити'));
+    };
+    const tg: any = window.Telegram?.WebApp;
+    if (tg?.showConfirm) tg.showConfirm('Видалити цю витрату?', (ok: boolean) => { if (ok) doDelete(); });
+    else doDelete();
+  }
+
+  const total = items.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  return (
+    <div className="fixed inset-0" style={{ zIndex: 200 }} onClick={handleClose}>
+      <div className={`${closing ? 'bb-backdrop-out' : 'bb-backdrop'} absolute inset-0 bg-black/40`} />
+      <div
+        className={`${closing ? 'bb-sheet-out' : 'bb-sheet'} absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col`}
+        style={{ background: 'var(--tg-theme-bg-color)', boxShadow: '0 -8px 32px var(--theme-glow-color)', maxHeight: '88vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="pt-3 pb-2 flex justify-center flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--tg-theme-secondary-bg-color)' }} />
+        </div>
+
+        <div ref={scrollRef} className="overflow-y-auto flex-1 px-5 pb-2 min-h-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet size={18} style={{ color: 'var(--tg-theme-button-color)' }} />
+            <h2 className="text-lg font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>Витрати за місяць</h2>
+          </div>
+          <p className="text-sm mb-4" style={{ color: 'var(--tg-theme-hint-color)' }}>
+            Разом: <span className="font-bold" style={{ color: '#e05c5c' }}>{fmtMoney(total)}</span>
+          </p>
+
+          {/* Форма додавання */}
+          <div className="rounded-2xl p-4 mb-4 space-y-2" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            <div className="flex gap-2">
+              <input
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="Сума, ₴"
+                inputMode="decimal"
+                className="flex-1 px-4 py-3 rounded-xl text-sm outline-none"
+                style={{ background: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-text-color)', border: '1.5px solid var(--tg-theme-button-color)44' }}
+              />
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="px-3 py-3 rounded-xl text-sm outline-none"
+                style={{ background: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-text-color)', border: '1.5px solid var(--tg-theme-button-color)44' }}
+              />
+            </div>
+            <input
+              value={desc}
+              onChange={e => setDesc(e.target.value)}
+              placeholder="Опис (напр. гель-лаки, фрези)"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{ background: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-text-color)', border: '1.5px solid var(--tg-theme-button-color)44' }}
+            />
+            <button
+              onClick={addExpense}
+              disabled={saving}
+              className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-opacity disabled:opacity-50"
+              style={{ background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)', boxShadow: 'var(--theme-btn-shadow)' }}>
+              <Plus size={16} /> {saving ? 'Додаємо...' : 'Додати витрату'}
+            </button>
+          </div>
+
+          {/* Список */}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--tg-theme-button-color)', borderTopColor: 'transparent' }} />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              Витрат за цей місяць ще немає
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {items.map(e => (
+                <div key={e.id} className="flex items-center gap-3 p-3.5 rounded-2xl"
+                  style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
+                      {fmtMoney(Number(e.amount))}
+                    </p>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                      {fmtExpenseDate(e.spentAt)}{e.description ? ` · ${e.description}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => removeExpense(e.id)} className="p-2 rounded-xl" style={{ color: '#c04040' }}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={handleClose}
+            className="w-full py-4 mt-3 rounded-2xl text-sm font-medium"
+            style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+            Закрити
+          </button>
+        </div>
+
+        <div style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))', flexShrink: 0 }} />
+      </div>
     </div>
   );
 }
@@ -235,6 +486,8 @@ function getMockStats(): DashboardStats {
   });
   return {
     revenueThisMonth: 18450,
+    expensesThisMonth: 3200,
+    netIncomeThisMonth: 15250,
     appointmentsThisMonth: 42,
     newClientsThisMonth: 8,
     completionRate: 91,
