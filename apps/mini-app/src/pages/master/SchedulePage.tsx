@@ -60,7 +60,28 @@ export default function SchedulePage() {
   }
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [removingApt, setRemovingApt] = useState<Set<string>>(new Set());
+  const [freeSlots, setFreeSlots] = useState<{ id: string; startAt: string; endAt: string }[]>([]);
   const seenIds = useRef<Set<string>>(new Set());
+
+  // Вільні слоти обраного дня — цілі для перетягування у календарі.
+  async function loadFreeSlots() {
+    if (!masterId) return;
+    const from = startOfDay(selectedDate).toISOString();
+    const to = addDays(startOfDay(selectedDate), 1).toISOString();
+    try { setFreeSlots(await slotsApi.getAvailable(masterId, from, to)); }
+    catch { setFreeSlots([]); }
+  }
+
+  // Перенос запису перетягуванням: викликає перевірений reschedule (+ пуш клієнту).
+  async function handleCalendarReschedule(aptId: string, newSlotId: string) {
+    try {
+      await appointmentsApi.reschedule(aptId, newSlotId);
+      await Promise.all([loadAppointments(false), loadFreeSlots(), loadMarks()]);
+    } catch (e) {
+      showApiError(e, 'Не вдалось перенести запис.');
+      throw e; // лишаємо панель підтвердження відкритою для повтору
+    }
+  }
 
   function deleteApt(id: string) {
     if (removingApt.has(id)) return;
@@ -87,6 +108,7 @@ export default function SchedulePage() {
     setNewIds(new Set());
     loadAppointments(false);
     loadMarks();
+    loadFreeSlots();
   }, [selectedDate, masterId]);
 
   // Розумний полінг: тихо оновлюємо розклад, поки сторінка відкрита й активна.
@@ -222,7 +244,9 @@ export default function SchedulePage() {
           <CalendarDayView
             day={selectedDate}
             appointments={todayAppointments}
+            freeSlots={freeSlots}
             onSelectApt={(a) => setDetailApt(a as Appointment)}
+            onReschedule={handleCalendarReschedule}
           />
         )
       ) : (
