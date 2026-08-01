@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { format, isSameDay } from 'date-fns';
+import { useUI } from '../context/UIContext';
 
 /** Мінімальна форма запису, потрібна таймлайну (сумісна зі SchedulePage). */
 export interface TimelineAppointment {
@@ -204,6 +205,15 @@ export function CalendarDayView({
   const [targetSlot, setTargetSlot] = useState<{ id: string; start: number } | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Поки триває драг/підтвердження — ховаємо нижнє меню (інакше панель ховається за ним).
+  const { hideNav, showNav } = useUI();
+  useEffect(() => {
+    if (phase !== 'idle') hideNav();
+    else showNav();
+  }, [phase, hideNav, showNav]);
+  // Страховка: повертаємо меню, якщо компонент розмонтувався під час драгу.
+  useEffect(() => () => showNav(), [showNav]);
+
   const haptic = (type: 'light' | 'medium' | 'heavy' = 'light') =>
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
 
@@ -228,7 +238,7 @@ export function CalendarDayView({
     if (phase !== 'idle') return;
     downPos.current = { x: e.clientX, y: e.clientY };
     startedDragRef.current = false;
-    const canDrag = DRAGGABLE.has(p.apt.status) && !!onReschedule && freeToday.length > 0;
+    const canDrag = DRAGGABLE.has(p.apt.status) && !!onReschedule;
     const pointerId = e.pointerId;
     const target = e.currentTarget as HTMLElement;
     if (canDrag) {
@@ -455,7 +465,11 @@ export function CalendarDayView({
       {phase === 'dragging' && (
         <div className="fixed left-0 right-0 bottom-0 z-50 px-5 py-3 text-center text-xs font-medium pointer-events-none"
           style={{ color: 'var(--tg-theme-hint-color)' }}>
-          {targetSlot ? `Відпусти на ${fmtMin(targetSlot.start)}` : 'Тягни до вільного вікна'}
+          {targetSlot
+            ? `Відпусти на ${fmtMin(targetSlot.start)}`
+            : freeToday.length
+              ? 'Тягни до вільного вікна'
+              : 'Немає вільних вікон — створи слот на екрані «Слоти»'}
         </div>
       )}
 

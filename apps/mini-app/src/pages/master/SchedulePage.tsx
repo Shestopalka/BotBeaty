@@ -38,6 +38,7 @@ const TAG_ICONS: Record<string, string> = {
 
 export default function SchedulePage() {
   const { master, hasFeature } = useMaster();
+  const { hideNav, showNav } = useUI();
   const calendarEnabled = hasFeature(FEATURES.CALENDAR_DAY_VIEW);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailApt, setDetailApt] = useState<Appointment | null>(null);
@@ -120,6 +121,11 @@ export default function SchedulePage() {
     }, 12000);
     return () => clearInterval(id);
   }, [masterId, selectedDate]);
+
+  // Поки відкрита панель деталей — ховаємо нижнє меню, щоб кнопки не ховались за ним.
+  useEffect(() => {
+    if (detailApt) { hideNav(); return () => showNav(); }
+  }, [detailApt]);
 
   async function loadAppointments(diff: boolean) {
     if (!diff) setLoading(true);
