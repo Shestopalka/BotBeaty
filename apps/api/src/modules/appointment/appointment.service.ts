@@ -587,8 +587,8 @@ export class AppointmentService {
       }
 
       // Перетин із будь-яким іншим не-видаленим слотом майстра → відмова.
+      // (без FOR UPDATE — Postgres не дозволяє блокування разом з COUNT.)
       const conflict = await m.getRepository(Slot).createQueryBuilder('s')
-        .setLock('pessimistic_write')
         .where('s."masterId" = :masterId', { masterId })
         .andWhere('s.id != :own', { own: apt.slotId })
         .andWhere('s."deletedAt" IS NULL')
