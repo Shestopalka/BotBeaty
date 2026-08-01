@@ -32,8 +32,9 @@ const HOUR_HEIGHT = 64;
 const GUTTER = 52;
 const LONG_PRESS_MS = 280;
 const MOVE_CANCEL_PX = 8;
-const SNAP_MIN = 15; // крок магніту часу під час перетягування
+const SNAP_MIN = 15;
 const INVALID = '#e05c5c';
+const EASE = 'cubic-bezier(0.32,0.72,0,1)';
 
 function statusColor(status: string): string {
   return STATUS_COLOR[status] ?? 'var(--tg-theme-button-color)';
@@ -179,29 +180,43 @@ export function CalendarDayView({
   const [dragAptId, setDragAptId] = useState<string | null>(null);
   const [curStart, setCurStart] = useState(0);
   const [validDrop, setValidDrop] = useState(true);
+  const [lift, setLift] = useState(false);        // плавне «відшарування» блока
+  const [panelUp, setPanelUp] = useState(false);   // панель виїжджає ПІСЛЯ повернення фону
+  const [panelClosing, setPanelClosing] = useState(false);
   const [saving, setSaving] = useState(false);
+
   const dragActive = phase === 'dragging' || phase === 'confirm';
+  const blurred = phase === 'dragging'; // фон розмитий лише поки тягнемо; у confirm — повертається
 
   const { hideNav, showNav } = useUI();
   useEffect(() => { if (phase !== 'idle') hideNav(); else showNav(); }, [phase, hideNav, showNav]);
   useEffect(() => () => showNav(), [showNav]);
 
+  // Плавне підняття/осідання блока + послідовний вихід панелі.
+  useEffect(() => {
+    if (phase === 'dragging') {
+      const id = requestAnimationFrame(() => setLift(true));
+      return () => cancelAnimationFrame(id);
+    }
+    if (phase === 'confirm') {
+      setLift(false); // блок плавно осідає на місце
+      const id = setTimeout(() => setPanelUp(true), 200); // потім виїжджає панель
+      return () => clearTimeout(id);
+    }
+    setLift(false);
+    setPanelUp(false);
+  }, [phase]);
+
   const haptic = (type: 'light' | 'medium' | 'heavy' = 'light') =>
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
   const clearPress = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } };
 
-  // Чи вільний інтервал [start, start+dur) — не перетинає інші записи й вільні слоти.
   const isValid = useCallback(
     (startMin: number, dur: number, exceptId: string): boolean => {
       const end = startMin + dur;
       if (startMin < rangeStartMin || end > rangeEndMin) return false;
-      for (const p of positioned) {
-        if (p.apt.id === exceptId) continue;
-        if (overlaps(startMin, end, p.start, p.end)) return false;
-      }
-      for (const f of freeToday) {
-        if (overlaps(startMin, end, f.start, f.end)) return false;
-      }
+      for (const p of positioned) { if (p.apt.id === exceptId) continue; if (overlaps(startMin, end, p.start, p.end)) return false; }
+      for (const f of freeToday) { if (overlaps(startMin, end, f.start, f.end)) return false; }
       return true;
     },
     [positioned, freeToday, rangeStartMin, rangeEndMin],
@@ -216,6 +231,7 @@ export function CalendarDayView({
   const resetDrag = () => {
     setPhase('idle');
     setDragAptId(null);
+    setPanelClosing(false);
     startedDragRef.current = false;
     dragRef.current = null;
   };
@@ -236,6 +252,7 @@ export function CalendarDayView({
         setDragAptId(p.apt.id);
         setCurStart(p.start);
         setValidDrop(true);
+        setLift(false);
         setPhase('dragging');
       }, LONG_PRESS_MS);
     }
@@ -278,14 +295,27 @@ export function CalendarDayView({
     else resetDrag();
   };
 
+  const slideOutThen = (fn: () => void) => {
+    setPanelUp(false);
+    setPanelClosing(true);
+    setTimeout(() => fn(), 280);
+  };
+
+  const handleCancel = () => {
+    const meta = draggedPos;
+    if (meta) setCurStart(meta.start); // блок плавно повертається на місце
+    slideOutThen(resetDrag);
+  };
+
   const handleSave = async () => {
-    const meta = { aptId: dragAptId, start: curStart };
-    if (!meta.aptId || !onRescheduleTime) return resetDrag();
+    const aptId = dragAptId;
+    const start = curStart;
+    if (!aptId || !onRescheduleTime) return resetDrag();
     setSaving(true);
     try {
-      await onRescheduleTime(meta.aptId, dayAtMinutes(meta.start));
+      await onRescheduleTime(aptId, dayAtMinutes(start));
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success');
-      resetDrag();
+      slideOutThen(resetDrag);
     } catch {
       /* помилку показує SchedulePage; лишаємось у confirm для повтору */
     } finally {
@@ -306,11 +336,12 @@ export function CalendarDayView({
       } as React.CSSProperties}
     >
       <div className="relative" style={{ height: totalHeight + 16 }}>
-        {/* ── БАЗОВИЙ ШАР: розмивається під час драгу ─────────────────────── */}
+        {/* ── БАЗОВИЙ ШАР: плавно розмивається під час драгу ──────────────── */}
         <div style={{
-          filter: dragActive ? 'blur(3.5px)' : 'none',
-          opacity: dragActive ? 0.75 : 1,
-          transition: 'filter 0.2s ease, opacity 0.2s ease',
+          filter: `blur(${blurred ? 3.5 : 0}px)`,
+          opacity: blurred ? 0.72 : 1,
+          transition: `filter 0.28s ${EASE}, opacity 0.28s ${EASE}`,
+          willChange: 'filter, opacity',
         }}>
           {hours.map((h, i) => (
             <div key={h} className="absolute left-0 right-0 flex items-start" style={{ top: i * HOUR_HEIGHT }}>
@@ -373,7 +404,7 @@ export function CalendarDayView({
           })}
         </div>
 
-        {/* ── ГОСТРИЙ ШАР під час драгу: години зліва + піднятий запис ─────── */}
+        {/* ── ГОСТРИЙ ШАР: години у фокусі + піднятий запис ───────────────── */}
         {dragActive && draggedPos && (() => {
           const dur = draggedPos.end - draggedPos.start;
           const top = minToTop(curStart);
@@ -381,25 +412,28 @@ export function CalendarDayView({
           const color = validDrop ? statusColor(draggedPos.apt.status) : INVALID;
           return (
             <>
-              {/* Яскраві години зліва (у фокусі) */}
-              {hours.map((h, i) => (
-                <span key={`hl-${h}`}
-                  className="absolute text-[11px] font-bold text-right pr-2 pointer-events-none"
-                  style={{ top: i * HOUR_HEIGHT - 6, left: 0, width: 44, color: 'var(--tg-theme-text-color)' }}>
-                  {String(h).padStart(2, '0')}:00
-                </span>
-              ))}
-              {/* Піднятий (відшарований) запис */}
+              {/* Яскраві години зліва — плавно проявляються й трохи збільшуються */}
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ animation: `bb-cal-focus 0.28s ${EASE} both` }}>
+                {hours.map((h, i) => (
+                  <span key={`hl-${h}`}
+                    className="absolute text-[11px] font-bold text-right pr-2"
+                    style={{ top: i * HOUR_HEIGHT - 6, left: 0, width: 44, color: 'var(--tg-theme-text-color)' }}>
+                    {String(h).padStart(2, '0')}:00
+                  </span>
+                ))}
+              </div>
+
+              {/* Піднятий (відшарований) запис — плавно росте/осідає */}
               <div
-                className={phase === 'dragging' ? 'bb-cal-lift' : ''}
                 style={{
                   position: 'absolute', top, left: GUTTER, width: `calc(100% - ${GUTTER}px - 3px)`, height,
                   background: `color-mix(in srgb, ${color} 20%, var(--tg-theme-bg-color))`,
                   borderLeft: `3px solid ${color}`,
                   borderRadius: 10, padding: '4px 8px', zIndex: 40,
-                  transform: 'scale(1.03)',
-                  boxShadow: '0 14px 34px rgba(0,0,0,0.32)',
-                  transition: phase === 'confirm' ? 'top 0.15s ease' : 'none',
+                  transform: lift ? 'scale(1.04)' : 'scale(1)',
+                  boxShadow: lift ? '0 16px 36px rgba(0,0,0,0.34)' : '0 2px 8px rgba(0,0,0,0.12)',
+                  transition: `transform 0.24s ${EASE}, box-shadow 0.24s ${EASE}, top 0.24s ${EASE}`,
                   pointerEvents: 'none',
                 }}>
                 <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--tg-theme-text-color)' }}>
@@ -414,18 +448,24 @@ export function CalendarDayView({
         })()}
       </div>
 
-      {/* ── Підказка / підтвердження — у портал, щоб fixed не ламався ──────── */}
+      {/* ── Підказка під час драгу ─────────────────────────────────────────── */}
       {phase === 'dragging' && createPortal(
-        <div className="fixed left-0 right-0 bottom-0 z-[60] px-5 pb-6 pt-3 text-center text-xs font-medium pointer-events-none"
+        <div className="fixed left-0 right-0 bottom-0 z-[60] px-5 pb-6 pt-3 text-center text-xs font-medium pointer-events-none bb-toast-in"
           style={{ color: validDrop ? 'var(--tg-theme-hint-color)' : INVALID }}>
           {validDrop ? 'Відпусти, щоб перенести сюди' : 'Цей час зайнятий — обери порожній'}
         </div>,
         document.body,
       )}
 
+      {/* ── Панель підтвердження: виїжджає після осідання, ховається плавно ── */}
       {phase === 'confirm' && draggedPos && createPortal(
-        <div className="fixed left-0 right-0 bottom-0 z-[60] p-4 bb-slide-up"
-          style={{ background: 'var(--tg-theme-bg-color)', boxShadow: '0 -8px 30px rgba(0,0,0,0.18)' }}>
+        <div className={`fixed left-0 right-0 bottom-0 z-[60] p-4 ${panelClosing ? 'bb-sheet-out' : panelUp ? 'bb-sheet' : ''}`}
+          style={{
+            background: 'var(--tg-theme-bg-color)',
+            boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
+            transform: panelUp || panelClosing ? undefined : 'translateY(100%)',
+            visibility: panelUp || panelClosing ? 'visible' : 'hidden',
+          }}>
           <p className="text-center text-sm mb-3" style={{ color: 'var(--tg-theme-text-color)' }}>
             Перенести запис на <b>{fmtMin(curStart)}</b>?
             <span className="block text-xs mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
@@ -433,7 +473,7 @@ export function CalendarDayView({
             </span>
           </p>
           <div className="flex gap-2 max-w-md mx-auto">
-            <button onClick={resetDrag} disabled={saving}
+            <button onClick={handleCancel} disabled={saving}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
               style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
               Скасувати

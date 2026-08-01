@@ -43,6 +43,12 @@ export default function SchedulePage() {
   const calendarEnabled = hasFeature(FEATURES.CALENDAR_DAY_VIEW);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailApt, setDetailApt] = useState<Appointment | null>(null);
+  const [detailClosing, setDetailClosing] = useState(false);
+  // Закриття панелі деталей з анімацією виходу (спершу програємо out, потім знімаємо).
+  function closeDetail() {
+    setDetailClosing(true);
+    setTimeout(() => { setDetailApt(null); setDetailClosing(false); }, 280);
+  }
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -316,21 +322,21 @@ export default function SchedulePage() {
 
       {/* Деталі запису при тапі на блок у календарі — у портал (fixed до вікна) */}
       {detailApt && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bb-backdrop"
-          style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setDetailApt(null)}>
-          <div className="bb-sheet w-full max-w-md p-4 pb-8 rounded-t-3xl"
+        <div className={`fixed inset-0 z-[60] flex items-end justify-center ${detailClosing ? 'bb-backdrop-out' : 'bb-backdrop'}`}
+          style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeDetail}>
+          <div className={`${detailClosing ? 'bb-sheet-out' : 'bb-sheet'} w-full max-w-md p-4 pb-8 rounded-t-3xl`}
             style={{ background: 'var(--tg-theme-bg-color)' }}
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-3"
               style={{ background: 'var(--tg-theme-hint-color)', opacity: 0.3 }} />
             <AppointmentCard
               apt={detailApt}
-              onDelete={() => { deleteApt(detailApt.id); setDetailApt(null); }}
-              onReschedule={() => { setRescheduleApt(detailApt); setDetailApt(null); }}
-              onConfirm={() => { updateStatus(detailApt.id, 'confirmed'); setDetailApt(null); }}
-              onCancel={() => { updateStatus(detailApt.id, 'cancelled_master'); setDetailApt(null); }}
-              onComplete={() => { updateStatus(detailApt.id, 'completed'); setDetailApt(null); }}
-              onNoShow={() => { updateStatus(detailApt.id, 'no_show'); setDetailApt(null); }}
+              onDelete={() => { deleteApt(detailApt.id); closeDetail(); }}
+              onReschedule={() => { setRescheduleApt(detailApt); closeDetail(); }}
+              onConfirm={() => { updateStatus(detailApt.id, 'confirmed'); closeDetail(); }}
+              onCancel={() => { updateStatus(detailApt.id, 'cancelled_master'); closeDetail(); }}
+              onComplete={() => { updateStatus(detailApt.id, 'completed'); closeDetail(); }}
+              onNoShow={() => { updateStatus(detailApt.id, 'no_show'); closeDetail(); }}
             />
           </div>
         </div>,
