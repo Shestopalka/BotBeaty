@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2, ArrowLeftRight, List, CalendarClock } from 'lucide-react';
@@ -73,10 +74,10 @@ export default function SchedulePage() {
     catch { setFreeSlots([]); }
   }
 
-  // Перенос запису перетягуванням: викликає перевірений reschedule (+ пуш клієнту).
-  async function handleCalendarReschedule(aptId: string, newSlotId: string) {
+  // Перенос запису перетягуванням на довільний час (+ пуш клієнту).
+  async function handleCalendarRescheduleTime(aptId: string, newStartISO: string) {
     try {
-      await appointmentsApi.reschedule(aptId, newSlotId);
+      await appointmentsApi.rescheduleToTime(aptId, newStartISO);
       await Promise.all([loadAppointments(false), loadFreeSlots(), loadMarks()]);
     } catch (e) {
       showApiError(e, 'Не вдалось перенести запис.');
@@ -252,7 +253,7 @@ export default function SchedulePage() {
             appointments={todayAppointments}
             freeSlots={freeSlots}
             onSelectApt={(a) => setDetailApt(a as Appointment)}
-            onReschedule={handleCalendarReschedule}
+            onRescheduleTime={handleCalendarRescheduleTime}
           />
         )
       ) : (
@@ -313,11 +314,11 @@ export default function SchedulePage() {
         />
       )}
 
-      {/* Деталі запису при тапі на блок у календарі */}
-      {detailApt && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bb-backdrop"
+      {/* Деталі запису при тапі на блок у календарі — у портал (fixed до вікна) */}
+      {detailApt && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bb-backdrop"
           style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setDetailApt(null)}>
-          <div className="bb-sheet w-full max-w-md p-4 rounded-t-3xl"
+          <div className="bb-sheet w-full max-w-md p-4 pb-8 rounded-t-3xl"
             style={{ background: 'var(--tg-theme-bg-color)' }}
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-3"
@@ -332,7 +333,8 @@ export default function SchedulePage() {
               onNoShow={() => { updateStatus(detailApt.id, 'no_show'); setDetailApt(null); }}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

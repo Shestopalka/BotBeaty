@@ -552,6 +552,87 @@ export class AppointmentService {
   }
 
   /**
+   * Перенести запис на ДОВІЛЬНИЙ час (перетягуванням у календарі).
+   * На відміну від reschedule (що чіпляється до наявного вільного слоту),
+   * тут ми рухаємо ВЛАСНИЙ слот запису на новий час, зберігаючи тривалість.
+   * Кидати можна лише в порожній час — будь-який перетин з іншим слотом майстра
+   * (зайнятим чи вільним) відхиляється, щоб уникнути накладань і дублю startAt.
+   */
+  async rescheduleToTime(
+    appointmentId: string,
+    newStartISO: string,
+    masterId: string,
+  ): Promise<Appointment> {
+    const fmt = (dt: any) =>
+      new Date(dt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' });
+    const newStart = new Date(newStartISO);
+    if (isNaN(newStart.getTime())) throw new BadRequestException('Некоректний час');
+
+    const { saved, notify } = await this.dataSource.transaction(async (m) => {
+      const apt = await m.getRepository(Appointment).findOne({
+        where: { id: appointmentId, masterId },
+        relations: ['slot', 'client', 'service'],
+      });
+      if (!apt) throw new NotFoundException('Запис не знайдено');
+      if (apt.status !== AppointmentStatus.PENDING && apt.status !== AppointmentStatus.CONFIRMED) {
+        throw new BadRequestException('Переносити можна лише активні записи');
+      }
+      if (!apt.slotId || !apt.slot) throw new BadRequestException('У запису немає слоту');
+
+      const oldStart = new Date(apt.slot.startAt);
+      const duration = new Date(apt.slot.endAt).getTime() - oldStart.getTime();
+      const newEnd = new Date(newStart.getTime() + duration);
+      if (Math.abs(newStart.getTime() - oldStart.getTime()) < 60_000) {
+        return { saved: apt, notify: null }; // менше хвилини різниці — нічого не робимо
+      }
+
+      // Перетин із будь-яким іншим не-видаленим слотом майстра → відмова.
+      const conflict = await m.getRepository(Slot).createQueryBuilder('s')
+        .setLock('pessimistic_write')
+        .where('s."masterId" = :masterId', { masterId })
+        .andWhere('s.id != :own', { own: apt.slotId })
+        .andWhere('s."deletedAt" IS NULL')
+        .andWhere('s."startAt" < :newEnd AND s."endAt" > :newStart', {
+          newEnd: newEnd.toISOString(),
+          newStart: newStart.toISOString(),
+        })
+        .getCount();
+      if (conflict > 0) {
+        throw new ConflictException('Цей час зайнятий іншим слотом або записом');
+      }
+
+      const oldTime = fmt(oldStart);
+      // Рухаємо ВЛАСНИЙ слот на новий час (та сама тривалість).
+      await m.getRepository(Slot).update(apt.slotId, { startAt: newStart, endAt: newEnd });
+      apt.slot.startAt = newStart;
+      apt.slot.endAt = newEnd;
+
+      await m.getRepository(AuditLog).save({
+        tableName: 'appointments', recordId: apt.id, action: AuditAction.UPDATE,
+        oldData: { slotTime: oldTime }, newData: { slotTime: fmt(newStart) },
+        changedBy: masterId, changedByType: 'master',
+      });
+
+      return {
+        saved: apt,
+        notify: {
+          appointmentId: apt.id,
+          clientTelegramId: apt.client?.telegramId ?? null,
+          serviceName: apt.service?.name ?? null,
+          oldTime,
+          newTime: fmt(newStart),
+        },
+      };
+    });
+
+    if (notify) {
+      await this.notificationsQueue.add('appointment_rescheduled', notify).catch((e) =>
+        this.logger?.warn?.(`enqueue reschedule-time notify failed: ${e?.message}`));
+    }
+    return saved;
+  }
+
+  /**
    * Поміняти місцями два записи (їхні слоти). Обидва лишаються заброньованими,
    * кожному клієнту йде повідомлення про новий час.
    */

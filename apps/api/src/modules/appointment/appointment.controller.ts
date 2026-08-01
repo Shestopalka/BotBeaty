@@ -118,6 +118,17 @@ export class AppointmentController {
     return this.appointmentService.reschedule(id, body.newSlotId, masterId);
   }
 
+  // Перенести запис на довільний час (перетягуванням у календарі).
+  @Patch(':id/reschedule-time')
+  rescheduleToTime(
+    @Param('id') id: string,
+    @Body() body: { newStartAt: string },
+    @CurrentMasterId() masterId: string,
+  ) {
+    if (!body?.newStartAt) throw new BadRequestException('Не вказано новий час');
+    return this.appointmentService.rescheduleToTime(id, body.newStartAt, masterId);
+  }
+
   // Поміняти місцями два записи.
   @Post('swap')
   swap(

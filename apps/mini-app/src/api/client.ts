@@ -62,6 +62,9 @@ export const appointmentsApi = {
   delete: (id: string) => api.delete(`/appointments/${id}`).then(r => r.data),
   reschedule: (id: string, newSlotId: string) =>
     api.patch(`/appointments/${id}/reschedule`, { newSlotId }).then(r => r.data),
+  // Перенос на довільний час (перетягування у календарі).
+  rescheduleToTime: (id: string, newStartAt: string) =>
+    api.patch(`/appointments/${id}/reschedule-time`, { newStartAt }).then(r => r.data),
   swap: (aptA: string, aptB: string) =>
     api.post('/appointments/swap', { aptA, aptB }).then(r => r.data),
 };
