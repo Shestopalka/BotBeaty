@@ -12,6 +12,7 @@ import { Appointment } from './database/entities/appointment.entity';
 import { Payment } from './database/entities/payment.entity';
 import { AuditLog } from './database/entities/audit-log.entity';
 import { Expense } from './database/entities/expense.entity';
+import { FeatureFlag } from './database/entities/feature-flag.entity';
 import { BotModule } from './modules/bot/bot.module';
 import { MasterModule } from './modules/master/master.module';
 import { ClientModule } from './modules/client/client.module';
@@ -23,6 +24,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ServiceModule } from './modules/service/service.module';
 import { ExpenseModule } from './modules/expense/expense.module';
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -56,7 +58,7 @@ import { HealthController } from './health.controller';
                 password: config.get('database.password'),
                 database: config.get('database.name'),
               }),
-          entities: [Master, Client, Service, Slot, Appointment, Payment, AuditLog, Expense],
+          entities: [Master, Client, Service, Slot, Appointment, Payment, AuditLog, Expense, FeatureFlag],
           migrations: ['dist/database/migrations/*.js'],
           // У проді схему створюють/оновлюють міграції, а не synchronize.
           migrationsRun: isProd,
@@ -113,6 +115,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     ServiceModule,
     ExpenseModule,
+    FeatureFlagsModule,
   ],
 })
 export class AppModule {}

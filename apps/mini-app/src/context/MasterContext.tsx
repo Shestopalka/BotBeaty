@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import api from '../api/client';
 import { applyTheme, ThemeName, THEMES } from '../themes';
+import { FeatureKey, FeatureMap, isFeatureOn } from '../lib/features';
 
 export interface Master {
   id: string;
@@ -33,6 +34,9 @@ export interface Master {
   defaultWorkEnd: string;
   defaultSlotDuration: number;
   defaultBreakMinutes: number;
+
+  // Ефективні feature flags (глобальні ∪ персональні). Приходять з /masters/me.
+  features?: FeatureMap;
 }
 
 // Перевіряємо чи тема існує у нашому словнику
@@ -46,6 +50,7 @@ interface MasterContextValue {
   isRegistered: boolean;
   networkError: boolean; // true = мережева помилка, false = 404/401
   refresh: () => Promise<void>;
+  hasFeature: (key: FeatureKey) => boolean;
 }
 
 const MasterContext = createContext<MasterContextValue>({
@@ -54,6 +59,7 @@ const MasterContext = createContext<MasterContextValue>({
   isRegistered: false,
   networkError: false,
   refresh: async () => {},
+  hasFeature: () => false,
 });
 
 export function MasterProvider({ children }: { children: ReactNode }) {
@@ -97,6 +103,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       isRegistered: !!master,
       networkError,
       refresh: fetchMaster,
+      hasFeature: (key: FeatureKey) => isFeatureOn(master?.features, key),
     }}>
       {children}
     </MasterContext.Provider>

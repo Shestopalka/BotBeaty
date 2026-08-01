@@ -6,9 +6,10 @@ import { MasterService } from './master.service';
 import { MasterController } from './master.controller';
 import { SubscriptionScheduler } from './subscription.scheduler';
 import { BotModule } from '../bot/bot.module';
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Master, Service]), BotModule],
+  imports: [TypeOrmModule.forFeature([Master, Service]), BotModule, FeatureFlagsModule],
   controllers: [MasterController],
   providers: [MasterService, SubscriptionScheduler],
   exports: [MasterService],

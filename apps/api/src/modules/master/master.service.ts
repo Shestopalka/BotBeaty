@@ -10,6 +10,7 @@ import { Client } from '../../database/entities/client.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { BotService } from '../bot/bot.service';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 export interface RegisterMasterDto {
   telegramId: string;
@@ -30,6 +31,7 @@ export class MasterService {
     private botService: BotService,
     @InjectDataSource()
     private dataSource: DataSource,
+    private featureFlags: FeatureFlagsService,
   ) {}
 
   async register(dto: RegisterMasterDto): Promise<Partial<Master>> {
@@ -85,7 +87,10 @@ export class MasterService {
   async findByTelegramId(telegramId: string): Promise<Partial<Master>> {
     const master = await this.masterRepo.findOne({ where: { telegramId } });
     if (!master) throw new NotFoundException('Майстра не знайдено');
-    return this.sanitize(master);
+    const clean = this.sanitize(master);
+    // Ефективний набір фіч (глобальні ∪ персональні override) — для mini-app.
+    (clean as any).features = await this.featureFlags.getEffectiveForMaster(master);
+    return clean;
   }
 
   /**

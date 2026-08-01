@@ -154,6 +154,12 @@ export class Master extends BaseEntity {
   @Column({ type: 'int', default: 15 })
   defaultBreakMinutes: number; // Перерва між слотами за замовчуванням (хв)
 
+  // ─── Feature flags (per-master overrides) ────────────────────────────────
+  // Персональні перемикачі фіч: { "calendar_day_view": true }.
+  // Ефективний стан фічі = глобально увімкнена АБО тут true.
+  @Column({ type: 'jsonb', default: {} })
+  featureFlags: Record<string, boolean>;
+
   // Версія для optimistic locking
   @Column({ type: 'int', default: 0 })
   version: number;

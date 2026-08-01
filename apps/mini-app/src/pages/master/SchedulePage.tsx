@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2, ArrowLeftRight } from 'lucide-react';
+import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2, ArrowLeftRight, List, CalendarClock } from 'lucide-react';
 import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
 import { useUI } from '../../context/UIContext';
 import { Illustration } from '../../components/Illustration';
 import { CalendarModal } from '../../components/CalendarModal';
+import { CalendarDayView } from '../../components/CalendarDayView';
+import { FEATURES } from '../../lib/features';
 import { formatPrice, formatPriceShort, PriceType } from '../../lib/price';
 import { showApiError } from '../../lib/notify';
 
@@ -35,7 +37,10 @@ const TAG_ICONS: Record<string, string> = {
 };
 
 export default function SchedulePage() {
-  const { master } = useMaster();
+  const { master, hasFeature } = useMaster();
+  const calendarEnabled = hasFeature(FEATURES.CALENDAR_DAY_VIEW);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [detailApt, setDetailApt] = useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,34 +182,79 @@ export default function SchedulePage() {
         })}
       </div>
 
-      {/* Список */}
-      <div className="flex-1 overflow-y-auto px-5 py-2 space-y-3">
-        {loading ? (
-          <div className="flex justify-center py-12">
+      {/* Перемикач Список / Календар — лише коли фіча увімкнена */}
+      {calendarEnabled && (
+        <div className="px-5 pb-1">
+          <div className="inline-flex p-0.5 rounded-xl"
+            style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
+            {([
+              { key: 'list', label: 'Список', Icon: List },
+              { key: 'calendar', label: 'Календар', Icon: CalendarClock },
+            ] as const).map(({ key, label, Icon }) => {
+              const active = viewMode === key;
+              return (
+                <button key={key} onClick={() => setViewMode(key)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all"
+                  style={active ? {
+                    background: 'var(--tg-theme-button-color)',
+                    color: 'var(--tg-theme-button-text-color)',
+                    boxShadow: 'var(--theme-btn-shadow)',
+                  } : {
+                    background: 'transparent',
+                    color: 'var(--tg-theme-hint-color)',
+                  }}>
+                  <Icon size={14} /> {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Календар (день-вʼю) */}
+      {calendarEnabled && viewMode === 'calendar' ? (
+        loading ? (
+          <div className="flex-1 flex justify-center py-12">
             <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin"
               style={{ borderColor: 'var(--tg-theme-button-color)', borderTopColor: 'transparent' }} />
           </div>
-        ) : todayAppointments.length === 0 ? (
-          <div className="flex flex-col items-center py-16 gap-3">
-            <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.8 }}>
-              <Illustration name="appointments" size={84} />
-            </span>
-            <p style={{ color: 'var(--tg-theme-hint-color)' }}>Записів немає</p>
-          </div>
         ) : (
-          todayAppointments.map(apt => (
-            <AppointmentCard key={apt.id} apt={apt} isNew={newIds.has(apt.id)}
-              isRemoving={removingApt.has(apt.id)}
-              onDelete={() => deleteApt(apt.id)}
-              onReschedule={() => setRescheduleApt(apt)}
-              onConfirm={() => updateStatus(apt.id, 'confirmed')}
-              onCancel={() => updateStatus(apt.id, 'cancelled_master')}
-              onComplete={() => updateStatus(apt.id, 'completed')}
-              onNoShow={() => updateStatus(apt.id, 'no_show')}
-            />
-          ))
-        )}
-      </div>
+          <CalendarDayView
+            day={selectedDate}
+            appointments={todayAppointments}
+            onSelectApt={(a) => setDetailApt(a as Appointment)}
+          />
+        )
+      ) : (
+        /* Список */
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--tg-theme-button-color)', borderTopColor: 'transparent' }} />
+            </div>
+          ) : todayAppointments.length === 0 ? (
+            <div className="flex flex-col items-center py-16 gap-3">
+              <span style={{ color: 'var(--tg-theme-button-color)', opacity: 0.8 }}>
+                <Illustration name="appointments" size={84} />
+              </span>
+              <p style={{ color: 'var(--tg-theme-hint-color)' }}>Записів немає</p>
+            </div>
+          ) : (
+            todayAppointments.map(apt => (
+              <AppointmentCard key={apt.id} apt={apt} isNew={newIds.has(apt.id)}
+                isRemoving={removingApt.has(apt.id)}
+                onDelete={() => deleteApt(apt.id)}
+                onReschedule={() => setRescheduleApt(apt)}
+                onConfirm={() => updateStatus(apt.id, 'confirmed')}
+                onCancel={() => updateStatus(apt.id, 'cancelled_master')}
+                onComplete={() => updateStatus(apt.id, 'completed')}
+                onNoShow={() => updateStatus(apt.id, 'no_show')}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {showBook && (
         <BookClientSheet
@@ -231,6 +281,28 @@ export default function SchedulePage() {
           onClose={() => setRescheduleApt(null)}
           onDone={() => { setRescheduleApt(null); loadAppointments(false); loadMarks(); }}
         />
+      )}
+
+      {/* Деталі запису при тапі на блок у календарі */}
+      {detailApt && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bb-backdrop"
+          style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setDetailApt(null)}>
+          <div className="bb-sheet w-full max-w-md p-4 rounded-t-3xl"
+            style={{ background: 'var(--tg-theme-bg-color)' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-3"
+              style={{ background: 'var(--tg-theme-hint-color)', opacity: 0.3 }} />
+            <AppointmentCard
+              apt={detailApt}
+              onDelete={() => { deleteApt(detailApt.id); setDetailApt(null); }}
+              onReschedule={() => { setRescheduleApt(detailApt); setDetailApt(null); }}
+              onConfirm={() => { updateStatus(detailApt.id, 'confirmed'); setDetailApt(null); }}
+              onCancel={() => { updateStatus(detailApt.id, 'cancelled_master'); setDetailApt(null); }}
+              onComplete={() => { updateStatus(detailApt.id, 'completed'); setDetailApt(null); }}
+              onNoShow={() => { updateStatus(detailApt.id, 'no_show'); setDetailApt(null); }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
