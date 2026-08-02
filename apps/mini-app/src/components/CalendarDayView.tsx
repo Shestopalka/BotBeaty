@@ -107,6 +107,7 @@ interface DragMeta {
   grabY: number;
   origStart: number;
   duration: number;
+  status: string;
 }
 
 export function CalendarDayView({
@@ -175,6 +176,13 @@ export function CalendarDayView({
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const downPos = useRef<{ x: number; y: number } | null>(null);
   const startedDragRef = useRef(false);
+  // Рефи для руху через DOM (без re-render під час драгу — плавні 60 fps).
+  const dragElRef = useRef<HTMLDivElement>(null);
+  const dragCardRef = useRef<HTMLDivElement>(null);
+  const dragLabelRef = useRef<HTMLDivElement>(null);
+  const hintRef = useRef<HTMLDivElement>(null);
+  const curStartRef = useRef(0);
+  const validRef = useRef(true);
 
   const [phase, setPhase] = useState<'idle' | 'dragging' | 'confirm'>('idle');
   const [dragAptId, setDragAptId] = useState<string | null>(null);
@@ -257,7 +265,9 @@ export function CalendarDayView({
     if (canDrag) {
       pressTimer.current = setTimeout(() => {
         startedDragRef.current = true;
-        dragRef.current = { aptId: p.apt.id, pointerId, grabY: downPos.current!.y, origStart: p.start, duration: p.end - p.start };
+        dragRef.current = { aptId: p.apt.id, pointerId, grabY: downPos.current!.y, origStart: p.start, duration: p.end - p.start, status: p.apt.status };
+        curStartRef.current = p.start;
+        validRef.current = true;
         try { target.setPointerCapture(pointerId); } catch { /* ignore */ }
         haptic('medium');
         setDragAptId(p.apt.id);
@@ -285,8 +295,22 @@ export function CalendarDayView({
     let next = meta.origStart + dyMin;
     next = Math.round(next / SNAP_MIN) * SNAP_MIN;
     next = Math.max(rangeStartMin, Math.min(next, rangeEndMin - meta.duration));
-    setCurStart(next);
-    setValidDrop(isValid(next, meta.duration, meta.aptId));
+    if (next === curStartRef.current) return;
+    curStartRef.current = next;
+    const valid = isValid(next, meta.duration, meta.aptId);
+    validRef.current = valid;
+    // Рухаємо напряму через DOM (GPU-transform) — без setState, тому 60 fps.
+    const color = valid ? statusColor(meta.status) : INVALID;
+    if (dragElRef.current) dragElRef.current.style.transform = `translateY(${minToTop(next)}px)`;
+    if (dragCardRef.current) dragCardRef.current.style.borderLeftColor = color;
+    if (dragLabelRef.current) {
+      dragLabelRef.current.textContent = `${fmtMin(next)}–${fmtMin(next + meta.duration)}${valid ? '' : ' · зайнято'}`;
+      dragLabelRef.current.style.color = color;
+    }
+    if (hintRef.current) {
+      hintRef.current.textContent = valid ? 'Відпусти, щоб перенести сюди' : 'Цей час зайнятий — обери порожній';
+      hintRef.current.style.color = valid ? 'var(--tg-theme-hint-color)' : INVALID;
+    }
   };
 
   const onBlockPointerUp = (e: React.PointerEvent, p: Positioned) => {
@@ -301,8 +325,13 @@ export function CalendarDayView({
     const meta = dragRef.current;
     dragRef.current = null;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    const changed = meta && Math.abs(curStart - meta.origStart) >= 1;
-    if (changed && validDrop) { haptic('heavy'); setPhase('confirm'); }
+    // Синхронізуємо стан із останнім положенням (DOM під час драгу вів сам).
+    const finalStart = curStartRef.current;
+    const valid = validRef.current;
+    setCurStart(finalStart);
+    setValidDrop(valid);
+    const changed = meta && Math.abs(finalStart - meta.origStart) >= 1;
+    if (changed && valid) { haptic('heavy'); setPhase('confirm'); }
     else resetDrag();
   };
 
@@ -418,9 +447,13 @@ export function CalendarDayView({
         {/* ── ГОСТРИЙ ШАР: години у фокусі + піднятий запис ───────────────── */}
         {dragActive && draggedPos && (() => {
           const dur = draggedPos.end - draggedPos.start;
-          const top = minToTop(curStart);
+          // Під час драгу читаємо позицію/валідність із рефів (їх веде DOM),
+          // щоб випадковий ре-рендер не скинув блок на стару позицію.
+          const curDisplay = phase === 'dragging' ? curStartRef.current : curStart;
+          const validDisplay = phase === 'dragging' ? validRef.current : validDrop;
+          const top = minToTop(curDisplay);
           const height = Math.max((dur / 60) * HOUR_HEIGHT - 3, 30);
-          const color = validDrop ? statusColor(draggedPos.apt.status) : INVALID;
+          const color = validDisplay ? statusColor(draggedPos.apt.status) : INVALID;
           return (
             <>
               {/* Яскраві години зліва — плавно проявляються й трохи збільшуються */}
@@ -435,23 +468,31 @@ export function CalendarDayView({
                 ))}
               </div>
 
-              {/* Піднятий (відшарований) запис — плавно росте/осідає */}
-              <div
+              {/* Піднятий запис: зовнішній рухається (translateY через DOM),
+                  внутрішній — плавно росте/осідає (scale через transition). */}
+              <div ref={dragElRef}
                 style={{
-                  position: 'absolute', top, left: GUTTER, width: `calc(100% - ${GUTTER}px - 3px)`, height,
-                  background: `color-mix(in srgb, ${color} 20%, var(--tg-theme-bg-color))`,
-                  borderLeft: `3px solid ${color}`,
-                  borderRadius: 10, padding: '4px 8px', zIndex: 40,
-                  transform: lift ? 'scale(1.04)' : 'scale(1)',
-                  boxShadow: lift ? '0 16px 36px rgba(0,0,0,0.34)' : '0 2px 8px rgba(0,0,0,0.12)',
-                  transition: `transform 0.24s ${EASE}, box-shadow 0.24s ${EASE}, top 0.24s ${EASE}`,
-                  pointerEvents: 'none',
+                  position: 'absolute', top: 0, left: GUTTER, width: `calc(100% - ${GUTTER}px - 3px)`, height, zIndex: 40,
+                  transform: `translateY(${top}px)`,
+                  transition: phase === 'confirm' ? `transform 0.24s ${EASE}` : 'none',
+                  pointerEvents: 'none', willChange: 'transform',
                 }}>
-                <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--tg-theme-text-color)' }}>
-                  {draggedPos.apt.client?.fullName ?? 'Клієнт'}
-                </div>
-                <div className="text-[10px] font-bold mt-0.5" style={{ color }}>
-                  {fmtMin(curStart)}–{fmtMin(curStart + dur)}{!validDrop ? ' · зайнято' : ''}
+                <div ref={dragCardRef}
+                  style={{
+                    height: '100%',
+                    background: `color-mix(in srgb, ${color} 20%, var(--tg-theme-bg-color))`,
+                    borderLeft: `3px solid ${color}`,
+                    borderRadius: 10, padding: '4px 8px',
+                    transform: lift ? 'scale(1.04)' : 'scale(1)',
+                    boxShadow: lift ? '0 16px 36px rgba(0,0,0,0.34)' : '0 2px 8px rgba(0,0,0,0.12)',
+                    transition: `transform 0.24s ${EASE}, box-shadow 0.24s ${EASE}`,
+                  }}>
+                  <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--tg-theme-text-color)' }}>
+                    {draggedPos.apt.client?.fullName ?? 'Клієнт'}
+                  </div>
+                  <div ref={dragLabelRef} className="text-[10px] font-bold mt-0.5" style={{ color }}>
+                    {fmtMin(curDisplay)}–{fmtMin(curDisplay + dur)}{!validDisplay ? ' · зайнято' : ''}
+                  </div>
                 </div>
               </div>
             </>
@@ -461,7 +502,8 @@ export function CalendarDayView({
 
       {/* ── Підказка під час драгу ─────────────────────────────────────────── */}
       {phase === 'dragging' && createPortal(
-        <div className="fixed left-0 right-0 bottom-0 z-[60] px-5 pb-6 pt-3 text-center text-xs font-medium pointer-events-none bb-toast-in"
+        <div ref={hintRef}
+          className="fixed left-0 right-0 bottom-0 z-[60] px-5 pb-6 pt-3 text-center text-xs font-medium pointer-events-none bb-toast-in"
           style={{ color: validDrop ? 'var(--tg-theme-hint-color)' : INVALID }}>
           {validDrop ? 'Відпусти, щоб перенести сюди' : 'Цей час зайнятий — обери порожній'}
         </div>,
