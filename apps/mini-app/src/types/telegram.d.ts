@@ -50,6 +50,12 @@ interface TelegramWebApp {
     notificationOccurred(type: 'error' | 'success' | 'warning'): void;
     selectionChanged(): void;
   };
+  // Керування нативним вертикальним свайпом (Bot API 7.7+). Опційні —
+  // на старих клієнтах методів може не бути, тому викликаємо через ?.().
+  isVerticalSwipesEnabled?: boolean;
+  disableVerticalSwipes?(): void;
+  enableVerticalSwipes?(): void;
+  isExpanded?: boolean;
 }
 
 interface Window {

@@ -192,6 +192,17 @@ export function CalendarDayView({
   useEffect(() => { if (phase !== 'idle') hideNav(); else showNav(); }, [phase, hideNav, showNav]);
   useEffect(() => () => showNav(), [showNav]);
 
+  // Поки відкритий календар — глушимо нативний вертикальний свайп Telegram.
+  // Інакше тягнення слота вниз згортає весь mini-app (жест «закрити»).
+  // Вимикаємо на весь час показу (а не лише під час драгу), бо нативний жест
+  // може «схопитися» ще до того, як спрацює затиск (~280 мс).
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    tg?.expand?.();
+    tg?.disableVerticalSwipes?.();
+    return () => { tg?.enableVerticalSwipes?.(); };
+  }, []);
+
   // Плавне підняття/осідання блока + послідовний вихід панелі.
   useEffect(() => {
     if (phase === 'dragging') {
