@@ -21,6 +21,7 @@ export interface CreateAppointmentDto {
   masterId: string;
   clientTelegramId: string;
   clientName: string;
+  clientUsername?: string; // TG нікнейм клієнта (без @), якщо є
   serviceId: string;
   slotId: string;
   clientNote?: string;
@@ -70,7 +71,7 @@ export class AppointmentService {
    * Використовує транзакцію — або все записується, або нічого.
    */
   async createAppointment(dto: CreateAppointmentDto): Promise<Appointment> {
-    return await this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       // 1. Перевіряємо що слот існує і вільний (з блокуванням рядка)
       const slot = await manager
         .getRepository(Slot)
@@ -98,20 +99,24 @@ export class AppointmentService {
       const phone = dto.clientPhone?.trim() || undefined;
       const name = dto.clientName?.trim() || undefined;
 
+      const username = dto.clientUsername?.trim().replace(/^@+/, '') || undefined;
+
       if (!client) {
         client = manager.getRepository(Client).create({
           telegramId: dto.clientTelegramId,
           fullName: name || 'Клієнт',
+          username,
           masterId: dto.masterId,
           phone,
           tag: ClientTag.NEW,
         });
         await manager.getRepository(Client).save(client);
       } else {
-        // Оновлюємо імʼя/номер, якщо клієнт вказав нові при записі.
+        // Оновлюємо імʼя/номер/нікнейм, якщо клієнт вказав нові при записі.
         let changed = false;
         if (name && client.fullName !== name) { client.fullName = name; changed = true; }
         if (phone && client.phone !== phone) { client.phone = phone; changed = true; }
+        if (username && client.username !== username) { client.username = username; changed = true; }
         if (changed) await manager.getRepository(Client).save(client);
       }
 
@@ -214,15 +219,20 @@ export class AppointmentService {
         changedByType: 'client',
       });
 
-      // 7. Ставимо в чергу нотифікації
-      await this.notificationsQueue.add('appointment_created', {
-        appointmentId: saved.id,
-        masterId: dto.masterId,
-        clientTelegramId: dto.clientTelegramId,
-      });
-
       return saved;
     });
+
+    // 7. Нотифікації — ПІСЛЯ коміту транзакції. Інакше воркер міг забрати задачу
+    // раніше, ніж запис з'явиться в БД (findOne → null → майстру НЕ приходив
+    // пуш, хоча запис уже був у кабінеті). Також збій Redis тепер не відкочує
+    // саме бронювання.
+    await this.notificationsQueue.add('appointment_created', {
+      appointmentId: saved.id,
+      masterId: dto.masterId,
+      clientTelegramId: dto.clientTelegramId,
+    }).catch((e) => this.logger.warn(`enqueue appointment_created failed: ${e?.message}`));
+
+    return saved;
   }
 
   /**

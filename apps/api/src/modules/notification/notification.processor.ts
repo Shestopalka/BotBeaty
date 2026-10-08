@@ -87,6 +87,7 @@ export class NotificationProcessor extends WorkerHost {
         apt.master,
         `🔔 <b>Новий запис!</b>\n\n` +
         `👤 Клієнт: ${apt.client?.fullName ?? '—'}\n` +
+        (apt.client?.username ? `🔗 Нік: @${apt.client.username}\n` : '') +
         (apt.client?.phone ? `📞 Телефон: ${apt.client.phone}\n` : '') +
         `💅 Послуга: ${apt.service?.name ?? '—'}\n` +
         `📅 Час: ${slotTime}\n` +

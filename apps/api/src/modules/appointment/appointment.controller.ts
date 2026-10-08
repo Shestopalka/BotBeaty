@@ -42,6 +42,8 @@ export class AppointmentController {
       ...dto,
       clientTelegramId: String(user.id),
       clientName: dto.clientName || `${user.first_name} ${user.last_name ?? ''}`.trim(),
+      // TG нікнейм беремо з автентифікованого користувача (не з тіла) — надійно.
+      clientUsername: user.username || undefined,
     });
   }
 

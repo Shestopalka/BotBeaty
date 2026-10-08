@@ -127,7 +127,7 @@ function makeMasterService() {
     update: async (_id: string, patch: any) => { lastUpdate = patch; Object.assign(stored, patch); },
     findOne: async () => ({ ...stored }),
   };
-  return { svc: new MasterService(repo as any, {} as any, {} as any), getLastUpdate: () => lastUpdate };
+  return { svc: new MasterService(repo as any, {} as any, {} as any, {} as any), getLastUpdate: () => lastUpdate };
 }
 
 test('updateOwnProfile: only whitelisted fields are written', async () => {
