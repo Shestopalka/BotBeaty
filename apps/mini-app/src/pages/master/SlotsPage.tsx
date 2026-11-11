@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { format, addDays, startOfDay, isSameDay, addMonths, getDaysInMonth, startOfMonth } from 'date-fns';
+import { kyivIso, kyivToday, toKyiv } from '../../lib/time';
 import { uk } from 'date-fns/locale';
 import { Plus, Trash2, ChevronLeft, ChevronRight, CalendarDays, X, Lock } from 'lucide-react';
 import { slotsApi } from '../../api/client';
@@ -28,7 +29,7 @@ const slotWord = (n: number) => plural(n, 'слот', 'слоти', 'слоті�
 const dayWord = (n: number) => plural(n, 'день', 'дні', 'днів');
 
 export default function SlotsPage() {
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState(kyivToday());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -80,7 +81,7 @@ export default function SlotsPage() {
 
   useEffect(() => {
     if (!stripRef.current) return;
-    const today = startOfDay(new Date());
+    const today = kyivToday();
     const diffDays = Math.round((selectedDate.getTime() - today.getTime()) / 86400000);
     const itemW = 56;
     stripRef.current.scrollTo({ left: Math.max(0, diffDays * itemW - 80), behavior: 'smooth' });
@@ -89,8 +90,8 @@ export default function SlotsPage() {
   async function loadSlots() {
     setLoading(true);
     try {
-      const from = selectedDate.toISOString();
-      const to = addDays(selectedDate, 1).toISOString();
+      const from = kyivIso(selectedDate);
+      const to = kyivIso(addDays(selectedDate, 1));
       // Майстер бачить УСІ свої слоти (вільні + зайняті), а не лише доступні
       const data = await slotsApi.getForMaster(masterId, from, to);
       setSlots(data);
@@ -121,7 +122,7 @@ export default function SlotsPage() {
     }
   }
 
-  const today = startOfDay(new Date());
+  const today = kyivToday();
 
   return (
     <div className="flex flex-col h-full">
@@ -238,11 +239,11 @@ export default function SlotsPage() {
                 }}
               >
                 <div>
-                  <p className="font-semibold text-sm">{format(new Date(slot.startAt), 'HH:mm')}</p>
+                  <p className="font-semibold text-sm">{format(toKyiv(slot.startAt), 'HH:mm')}</p>
                   <p className="text-xs flex items-center gap-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
                     {slot.isBooked
                       ? (<><Lock size={11} /> Зайнято</>)
-                      : `до ${format(new Date(slot.endAt), 'HH:mm')}`}
+                      : `до ${format(toKyiv(slot.endAt), 'HH:mm')}`}
                   </p>
                 </div>
                 {!slot.isBooked && (
@@ -304,7 +305,7 @@ function CalendarModal({ selected, onSelect, onClose }: {
     setClosing(true);
     setTimeout(() => onSelect(d), CLOSE_MS);
   }
-  const today = startOfDay(new Date());
+  const today = kyivToday();
   const daysInMonth = getDaysInMonth(viewMonth);
   const firstDOW = (new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1).getDay() + 6) % 7;
   const days = Array.from({ length: daysInMonth }, (_, i) =>
@@ -424,7 +425,7 @@ function AddSlotsSheet({ masterId, date, onClose, onSaved, onError, defaultWorkS
   const rangeMin = toMin(endTime) - toMin(startTime);
 
   const weekDays = Array.from({ length: 30 }, (_, i) => {
-    const d = addDays(startOfDay(new Date()), i);
+    const d = addDays(kyivToday(), i);
     return { date: d, str: format(d, 'yyyy-MM-dd') };
   });
 

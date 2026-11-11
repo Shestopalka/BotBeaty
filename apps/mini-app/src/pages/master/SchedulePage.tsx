@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
+import { kyivIso, kyivNow, kyivToday, toKyiv } from '../../lib/time';
 import { uk } from 'date-fns/locale';
 import { Check, X, Clock, Calendar, UserX, Phone, Copy, Plus, Trash2, ArrowLeftRight, List, CalendarClock } from 'lucide-react';
 import { appointmentsApi, clientsApi, slotsApi, mastersApi } from '../../api/client';
@@ -49,7 +50,7 @@ export default function SchedulePage() {
     setDetailClosing(true);
     setTimeout(() => { setDetailApt(null); setDetailClosing(false); }, 280);
   }
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState(kyivToday());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const masterId = master?.id ?? '';
@@ -60,8 +61,8 @@ export default function SchedulePage() {
 
   function loadMarks() {
     if (!masterId) return;
-    const from = addDays(startOfDay(new Date()), -31).toISOString();
-    const to = addDays(startOfDay(new Date()), 120).toISOString();
+    const from = kyivIso(addDays(kyivToday(), -31));
+    const to = kyivIso(addDays(kyivToday(), 120));
     appointmentsApi.getDays(masterId, from, to)
       .then((d: string[]) => setMarkedDays(new Set(d)))
       .catch(() => {});
@@ -74,8 +75,8 @@ export default function SchedulePage() {
   // Вільні слоти обраного дня — цілі для перетягування у календарі.
   async function loadFreeSlots() {
     if (!masterId) return;
-    const from = startOfDay(selectedDate).toISOString();
-    const to = addDays(startOfDay(selectedDate), 1).toISOString();
+    const from = kyivIso(startOfDay(selectedDate));
+    const to = kyivIso(addDays(startOfDay(selectedDate), 1));
     try { setFreeSlots(await slotsApi.getAvailable(masterId, from, to)); }
     catch { setFreeSlots([]); }
   }
@@ -162,9 +163,9 @@ export default function SchedulePage() {
   }
 
   // Стрічка на ~2 місяці вперед — гортається горизонтально.
-  const weekDays = Array.from({ length: 62 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const weekDays = Array.from({ length: 62 }, (_, i) => addDays(kyivToday(), i));
   const todayAppointments = appointments.filter(apt =>
-    isSameDay(new Date(apt.slot?.startAt ?? Date.now()), selectedDate)
+    isSameDay(toKyiv(apt.slot?.startAt ?? Date.now()), selectedDate)
   );
 
   return (
@@ -196,7 +197,7 @@ export default function SchedulePage() {
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
         {weekDays.map((day) => {
           const isSel = isSameDay(day, selectedDate);
-          const isToday = isSameDay(day, new Date());
+          const isToday = isSameDay(day, kyivNow());
           return (
             <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
               className="flex flex-col items-center min-w-[48px] flex-shrink-0 py-2.5 px-1 rounded-2xl transition-all"
@@ -350,8 +351,8 @@ function AppointmentCard({ apt, isNew, isRemoving, onDelete, onReschedule, onCon
   apt: Appointment; isNew?: boolean; isRemoving?: boolean; onDelete: () => void; onReschedule: () => void; onConfirm: () => void; onCancel: () => void; onComplete: () => void; onNoShow: () => void;
 }) {
   const terminal = ['cancelled_client', 'cancelled_master', 'no_show', 'completed'].includes(apt.status);
-  const startTime = format(new Date(apt.slot?.startAt ?? Date.now()), 'HH:mm');
-  const endTime = format(new Date(apt.slot?.endAt ?? Date.now()), 'HH:mm');
+  const startTime = format(toKyiv(apt.slot?.startAt ?? Date.now()), 'HH:mm');
+  const endTime = format(toKyiv(apt.slot?.endAt ?? Date.now()), 'HH:mm');
   const status = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG.pending;
   const phone = apt.client?.phone;
   const [copied, setCopied] = useState(false);
@@ -501,7 +502,7 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
   // Якщо в розкладі обрано минулий день — для запису стартуємо з сьогодні
   // (минулих днів немає у стрічці вибору).
   const [date, setDate] = useState(() => {
-    const today0 = startOfDay(new Date());
+    const today0 = kyivToday();
     const init0 = startOfDay(initialDate);
     return init0.getTime() < today0.getTime() ? today0 : init0;
   });
@@ -535,19 +536,19 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
   useEffect(() => {
     setSlotsLoading(true);
     setSlot(null);
-    const from = date.toISOString();
-    const to = addDays(date, 1).toISOString();
+    const from = kyivIso(date);
+    const to = kyivIso(addDays(date, 1));
     // getForMaster — усі слоти майстра (як на сторінці «Слоти»). Беремо вільні
     // обраного дня. На відміну від getAvailable, не відкидаємо «минулі» —
     // майстер бачить ті самі слоти, що й у себе в розкладі.
     slotsApi.getForMaster(masterId, from, to)
       .then((data: SlotLite[]) =>
-        setSlots(data.filter(s => !s.isBooked && isSameDay(new Date(s.startAt), date))))
+        setSlots(data.filter(s => !s.isBooked && isSameDay(toKyiv(s.startAt), date))))
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false));
   }, [date, masterId]);
 
-  const days = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const days = Array.from({ length: 30 }, (_, i) => addDays(kyivToday(), i));
   const filteredClients = clients.filter(c =>
     c.tag !== 'blocked' && c.fullName.toLowerCase().includes(search.toLowerCase()));
 
@@ -572,7 +573,7 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
           : { clientName: newName.trim(), clientPhone: newPhone.trim() || undefined }),
       });
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
-      onCreated(new Date(slot.startAt));
+      onCreated(toKyiv(slot.startAt));
     } catch (e) {
       showApiError(e, 'Не вдалось створити запис.');
     } finally {
@@ -645,7 +646,7 @@ function BookClientSheet({ masterId, initialDate, onClose, onCreated }: {
                     style={slot?.id === s.id
                       ? { background: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color)' }
                       : { background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
-                    {format(new Date(s.startAt), 'HH:mm')}
+                    {format(toKyiv(s.startAt), 'HH:mm')}
                   </button>
                 ))}
               </div>
@@ -717,8 +718,8 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
   const [closing, setClosing] = useState(false);
   const CLOSE_MS = 280;
   const [mode, setMode] = useState<'slot' | 'swap'>('slot');
-  const today0 = startOfDay(new Date());
-  const startD = apt.slot?.startAt ? startOfDay(new Date(apt.slot.startAt)) : today0;
+  const today0 = kyivToday();
+  const startD = apt.slot?.startAt ? startOfDay(toKyiv(apt.slot.startAt)) : today0;
   const [date, setDate] = useState(startD.getTime() < today0.getTime() ? today0 : startD);
   const [slots, setSlots] = useState<SlotLite[]>([]);
   const [appts, setAppts] = useState<any[]>([]);
@@ -729,10 +730,10 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
 
   useEffect(() => {
     setLoading(true);
-    const from = date.toISOString(); const to = addDays(date, 1).toISOString();
+    const from = kyivIso(date); const to = kyivIso(addDays(date, 1));
     if (mode === 'slot') {
       slotsApi.getForMaster(masterId, from, to)
-        .then((d: SlotLite[]) => setSlots(d.filter(s => !s.isBooked && isSameDay(new Date(s.startAt), date) && s.id !== apt.slotId)))
+        .then((d: SlotLite[]) => setSlots(d.filter(s => !s.isBooked && isSameDay(toKyiv(s.startAt), date) && s.id !== apt.slotId)))
         .catch(() => setSlots([])).finally(() => setLoading(false));
     } else {
       appointmentsApi.getByMaster(masterId, format(date, 'yyyy-MM-dd'))
@@ -741,7 +742,7 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
     }
   }, [mode, date, masterId]);
 
-  const days = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const days = Array.from({ length: 30 }, (_, i) => addDays(kyivToday(), i));
   function handleClose() { if (closing) return; setClosing(true); setTimeout(onClose, CLOSE_MS); }
   function doReschedule(slotId: string) {
     if (submitting) return; setSubmitting(true);
@@ -755,7 +756,7 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
       .then(() => { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success'); onDone(); })
       .catch((e) => { setSubmitting(false); showApiError(e, 'Не вдалось обміняти записи.'); });
   }
-  const curTime = apt.slot?.startAt ? format(new Date(apt.slot.startAt), 'd MMM · HH:mm', { locale: uk }) : '';
+  const curTime = apt.slot?.startAt ? format(toKyiv(apt.slot.startAt), 'd MMM · HH:mm', { locale: uk }) : '';
 
   return (
     <div className="fixed inset-0" style={{ zIndex: 200 }} onClick={handleClose}>
@@ -815,7 +816,7 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
                   <button key={s.id} onClick={() => doReschedule(s.id)} disabled={submitting}
                     className="py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
                     style={{ background: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
-                    {format(new Date(s.startAt), 'HH:mm')}
+                    {format(toKyiv(s.startAt), 'HH:mm')}
                   </button>
                 ))}
               </div>
@@ -833,7 +834,7 @@ function RescheduleSheet({ apt, masterId, onClose, onDone }: {
                       {a.client?.fullName ?? 'Клієнт'} · {a.service?.name ?? '—'}
                     </span>
                     <span className="text-sm font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
-                      {a.slot?.startAt ? format(new Date(a.slot.startAt), 'HH:mm') : ''}
+                      {a.slot?.startAt ? format(toKyiv(a.slot.startAt), 'HH:mm') : ''}
                     </span>
                   </button>
                 ))}

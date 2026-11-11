@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { format } from 'date-fns';
+import { APP_TZ, fromKyiv, kyivIso, kyivNow } from '../../lib/time';
 import { TrendingUp, TrendingDown, Users, Award, Wallet, Plus, Trash2, ChevronRight } from 'lucide-react';
 import { analyticsApi, expensesApi } from '../../api/client';
 import { useMaster } from '../../context/MasterContext';
@@ -39,10 +41,11 @@ interface Expense {
 
 // Межі поточного місяця (ISO) — для журналу витрат і синхронізації з бекендом.
 function monthRange(): { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  return { from: from.toISOString(), to: to.toISOString() };
+  // Місяць — київський, незалежно від поясу телефону.
+  const now = kyivNow();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { from: kyivIso(from), to: new Date(fromKyiv(to).getTime() - 1).toISOString() };
 }
 
 function fmtMoney(n: number): string {
@@ -52,7 +55,7 @@ function fmtMoney(n: number): string {
 function fmtExpenseDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('uk-UA', { timeZone: APP_TZ, day: '2-digit', month: 'short' });
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -304,7 +307,7 @@ function ExpenseSheet({ onClose, onChanged }: {
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState('');
   const [desc, setDesc] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => format(kyivNow(), 'yyyy-MM-dd'));
   const [saving, setSaving] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const CLOSE_MS = 280;
@@ -342,7 +345,7 @@ function ExpenseSheet({ onClose, onChanged }: {
     setSaving(true);
     try {
       // spentAt — обраний день о 12:00 (щоб не було зсуву у крайні дні місяця).
-      const spentAt = new Date(`${date}T12:00:00`).toISOString();
+      const spentAt = kyivIso(new Date(`${date}T12:00:00`));
       await expensesApi.create({ amount: value, description: desc.trim() || undefined, spentAt });
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
       setAmount('');

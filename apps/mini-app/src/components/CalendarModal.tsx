@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format, addMonths, getDaysInMonth, startOfDay, isSameDay } from 'date-fns';
+import { kyivToday } from '../lib/time';
 import { uk } from 'date-fns/locale';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUI } from '../context/UIContext';
@@ -34,7 +35,7 @@ export function CalendarModal({ selected, onSelect, onClose, markedDays }: {
     setTimeout(() => onSelect(d), CLOSE_MS);
   }
 
-  const today = startOfDay(new Date());
+  const today = kyivToday();
   const daysInMonth = getDaysInMonth(viewMonth);
   const firstDOW = (new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1).getDay() + 6) % 7;
   const days = Array.from({ length: daysInMonth }, (_, i) =>

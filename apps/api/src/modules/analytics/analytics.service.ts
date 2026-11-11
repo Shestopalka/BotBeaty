@@ -5,6 +5,7 @@ import { Appointment, AppointmentStatus } from '../../database/entities/appointm
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { Client, ClientTag } from '../../database/entities/client.entity';
 import { Expense } from '../../database/entities/expense.entity';
+import { kyivMonthStart } from '../../common/time';
 
 export interface DashboardStats {
   // Поточний місяць
@@ -44,11 +45,13 @@ export class AnalyticsService {
 
   async getDashboard(masterId: string): Promise<DashboardStats> {
     const now = new Date();
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Межі місяців — київські (сервер у UTC). Кінець = початок наступного − 1 мс,
+    // бо нижче використовується BETWEEN (включно з обох боків).
     // Кінець місяця — рахуємо ВСІ записи місяця, включаючи майбутні
-    const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    const thisMonthStart = kyivMonthStart(0, now);
+    const thisMonthEnd = new Date(kyivMonthStart(1, now).getTime() - 1);
+    const lastMonthStart = kyivMonthStart(-1, now);
+    const lastMonthEnd = new Date(thisMonthStart.getTime() - 1);
     const last30days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [

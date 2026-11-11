@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { format, isSameDay } from 'date-fns';
+import { kyivIso, kyivNow, toKyiv } from '../lib/time';
 import { useUI } from '../context/UIContext';
 
 /** Мінімальна форма запису, потрібна таймлайну (сумісна зі SchedulePage). */
@@ -40,7 +41,7 @@ function statusColor(status: string): string {
   return STATUS_COLOR[status] ?? 'var(--tg-theme-button-color)';
 }
 function minutesOfDay(iso: string): number {
-  const d = new Date(iso);
+  const d = toKyiv(iso);
   return d.getHours() * 60 + d.getMinutes();
 }
 function fmtMin(min: number): string {
@@ -128,7 +129,7 @@ export function CalendarDayView({
   const freeToday = useMemo(
     () =>
       freeSlots
-        .filter((s) => s.startAt && isSameDay(new Date(s.startAt), day))
+        .filter((s) => s.startAt && isSameDay(toKyiv(s.startAt), day))
         .map((s) => ({ start: minutesOfDay(s.startAt), end: minutesOfDay(s.endAt) })),
     [freeSlots, day],
   );
@@ -150,11 +151,11 @@ export function CalendarDayView({
   const minToTop = (min: number) => ((min - rangeStartMin) / 60) * HOUR_HEIGHT;
 
   // ── Лінія «зараз» ─────────────────────────────────────────────────────────
-  const isToday = isSameDay(day, new Date());
-  const [nowMin, setNowMin] = useState(() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); });
+  const isToday = isSameDay(day, kyivNow());
+  const [nowMin, setNowMin] = useState(() => { const n = kyivNow(); return n.getHours() * 60 + n.getMinutes(); });
   useEffect(() => {
     if (!isToday) return;
-    const id = setInterval(() => { const n = new Date(); setNowMin(n.getHours() * 60 + n.getMinutes()); }, 60000);
+    const id = setInterval(() => { const n = kyivNow(); setNowMin(n.getHours() * 60 + n.getMinutes()); }, 60000);
     return () => clearInterval(id);
   }, [isToday]);
   const nowVisible = isToday && nowMin >= rangeStartMin && nowMin <= rangeEndMin;
@@ -244,7 +245,7 @@ export function CalendarDayView({
   const dayAtMinutes = (min: number): string => {
     const d = new Date(day);
     d.setHours(Math.floor(min / 60), Math.round(min % 60), 0, 0);
-    return d.toISOString();
+    return kyivIso(d); // day — київський wall-Date, тож і хвилини — київські
   };
 
   const resetDrag = () => {
@@ -396,7 +397,7 @@ export function CalendarDayView({
           {nowVisible && (
             <div className="absolute left-0 right-0 flex items-center pointer-events-none" style={{ top: minToTop(nowMin) }}>
               <span className="text-[10px] font-bold w-[44px] text-right pr-2" style={{ color: '#e05c5c' }}>
-                {format(new Date(), 'HH:mm')}
+                {format(kyivNow(), 'HH:mm')}
               </span>
               <div className="flex-1 h-px" style={{ background: '#e05c5c' }} />
               <div className="w-2 h-2 rounded-full -ml-1" style={{ background: '#e05c5c' }} />
@@ -436,7 +437,7 @@ export function CalendarDayView({
                 </div>
                 {!compact && (
                   <div className="text-[10px] truncate mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
-                    {p.apt.slot ? format(new Date(p.apt.slot.startAt), 'HH:mm') + ' · ' : ''}{p.apt.service?.name ?? ''}
+                    {p.apt.slot ? format(toKyiv(p.apt.slot.startAt), 'HH:mm') + ' · ' : ''}{p.apt.service?.name ?? ''}
                   </div>
                 )}
               </div>

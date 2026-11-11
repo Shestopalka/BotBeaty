@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
+import { kyivIso, kyivNow, kyivToday, toKyiv } from '../../lib/time';
 import { uk } from 'date-fns/locale';
 import { mastersApi, slotsApi, appointmentsApi, getInitData } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -36,7 +37,7 @@ export default function BookingPage() {
   const [master, setMaster] = useState<Master | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState(kyivToday());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
   const [masterLoading, setMasterLoading] = useState(true);
@@ -90,7 +91,7 @@ export default function BookingPage() {
   // повертаємо на сьогодні. Перевіряємо на маунті та коли застосунок знову видно.
   useEffect(() => {
     function syncToday() {
-      const today = startOfDay(new Date());
+      const today = kyivToday();
       setSelectedDate((prev) => (prev.getTime() < today.getTime() ? today : prev));
     }
     syncToday();
@@ -100,8 +101,8 @@ export default function BookingPage() {
 
   async function loadSlots() {
     setLoading(true);
-    const from = selectedDate.toISOString();
-    const to = addDays(selectedDate, 1).toISOString();
+    const from = kyivIso(selectedDate);
+    const to = kyivIso(addDays(selectedDate, 1));
     try {
       const data = await slotsApi.getAvailable(masterId!, from, to);
       const now = Date.now();
@@ -109,7 +110,7 @@ export default function BookingPage() {
       setSlots(
         data.filter(
           (s: Slot) =>
-            isSameDay(new Date(s.startAt), selectedDate) &&
+            isSameDay(toKyiv(s.startAt), selectedDate) &&
             new Date(s.startAt).getTime() > now,
         ),
       );
@@ -181,7 +182,7 @@ export default function BookingPage() {
     }
   }
 
-  const weekDays = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
+  const weekDays = Array.from({ length: 30 }, (_, i) => addDays(kyivToday(), i));
 
   if (masterLoading) {
     return (
@@ -220,8 +221,8 @@ export default function BookingPage() {
     let nextLabel = '—';
     if (nextSlot === undefined) nextLabel = '…';
     else if (nextSlot) {
-      const d = new Date(nextSlot);
-      nextLabel = isSameDay(d, new Date())
+      const d = toKyiv(nextSlot);
+      nextLabel = isSameDay(d, kyivNow())
         ? `сьогодні ${format(d, 'HH:mm')}`
         : format(d, 'd MMM', { locale: uk });
     } else nextLabel = 'запит';
@@ -426,7 +427,7 @@ export default function BookingPage() {
                     className="py-3 rounded-xl text-sm font-medium text-center"
                     style={{ background: 'var(--tg-theme-secondary-bg-color)' }}
                   >
-                    {format(new Date(slot.startAt), 'HH:mm')}
+                    {format(toKyiv(slot.startAt), 'HH:mm')}
                   </button>
                 ))}
               </div>
@@ -445,8 +446,8 @@ export default function BookingPage() {
 
           <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--tg-theme-secondary-bg-color)' }}>
             <Row label="Послуга" value={selectedService.name} />
-            <Row label="Дата" value={format(new Date(selectedSlot.startAt), 'd MMMM yyyy', { locale: uk })} />
-            <Row label="Час" value={format(new Date(selectedSlot.startAt), 'HH:mm')} />
+            <Row label="Дата" value={format(toKyiv(selectedSlot.startAt), 'd MMMM yyyy', { locale: uk })} />
+            <Row label="Час" value={format(toKyiv(selectedSlot.startAt), 'HH:mm')} />
             <Row label="Тривалість" value={`${selectedService.durationMinutes} хв`} />
             <div className="border-t pt-3" style={{ borderColor: 'var(--tg-theme-hint-color)' }}>
               <Row label="Вартість" value={formatPrice(selectedService)} bold />
@@ -526,8 +527,8 @@ export default function BookingPage() {
           <div className="w-full rounded-2xl p-4 space-y-2.5 mt-2"
             style={{ background: 'var(--tg-theme-secondary-bg-color)', boxShadow: 'var(--theme-shadow)' }}>
             <Row label="Послуга" value={selectedService.name} />
-            <Row label="Дата" value={format(new Date(selectedSlot.startAt), 'd MMMM yyyy', { locale: uk })} />
-            <Row label="Час" value={format(new Date(selectedSlot.startAt), 'HH:mm')} />
+            <Row label="Дата" value={format(toKyiv(selectedSlot.startAt), 'd MMMM yyyy', { locale: uk })} />
+            <Row label="Час" value={format(toKyiv(selectedSlot.startAt), 'HH:mm')} />
             <div className="border-t pt-2.5" style={{ borderColor: 'var(--tg-theme-hint-color)22' }}>
               <Row label="Вартість" value={formatPrice(selectedService)} bold />
             </div>

@@ -63,7 +63,7 @@ export class AppointmentController {
   ) {
     return this.appointmentService.getByMaster(
       masterId,
-      date ? new Date(date) : undefined,
+      date || undefined,
     );
   }
 
