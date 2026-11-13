@@ -11,3 +11,13 @@ export const TgUser = createParamDecorator(
     return request.telegramUser;
   },
 );
+
+/**
+ * Id майстра, чиїм ботом підписано initData (null — платформений бот).
+ * Клієнтська ідентичність, підписана ботом майстра X, валідна лише для даних X.
+ */
+export const AuthBotMasterId = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): string | null => {
+    return ctx.switchToHttp().getRequest().authBotMasterId ?? null;
+  },
+);

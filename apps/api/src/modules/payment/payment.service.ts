@@ -27,12 +27,22 @@ export class PaymentService {
   /**
    * Надіслати інвойс через Telegram Payments
    */
-  async sendTelegramInvoice(appointmentId: string): Promise<void> {
+  async sendTelegramInvoice(
+    appointmentId: string,
+    caller: { masterId?: string; clientTelegramId: string; botMasterId: string | null },
+  ): Promise<void> {
     const apt = await this.appointmentRepo.findOne({
       where: { id: appointmentId },
       relations: ['client', 'service', 'master', 'slot'],
     });
     if (!apt) throw new NotFoundException('Запис не знайдено');
+
+    // Інвойс може ініціювати лише майстер цього запису або сам клієнт запису.
+    const isOwnerMaster = !!caller.masterId && caller.masterId === apt.masterId;
+    const isOwnerClient =
+      apt.client?.telegramId === caller.clientTelegramId &&
+      (!caller.botMasterId || caller.botMasterId === apt.masterId);
+    if (!isOwnerMaster && !isOwnerClient) throw new NotFoundException('Запис не знайдено');
 
     const slotTime = apt.slot.startAt.toLocaleString('uk-UA', {
       timeZone: 'Europe/Kyiv',

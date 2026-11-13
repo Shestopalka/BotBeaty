@@ -401,6 +401,7 @@ export class AppointmentService {
   async cancelByClient(
     appointmentId: string,
     clientTelegramId: string,
+    botMasterId: string | null = null,
   ): Promise<Appointment> {
     return await this.dataSource.transaction(async (manager) => {
       const appointment = await manager.getRepository(Appointment).findOne({
@@ -410,6 +411,9 @@ export class AppointmentService {
 
       if (!appointment) throw new NotFoundException('Запис не знайдено');
       if (appointment.client?.telegramId !== clientTelegramId) {
+        throw new BadRequestException('Запис недоступний');
+      }
+      if (botMasterId && appointment.masterId !== botMasterId) {
         throw new BadRequestException('Запис недоступний');
       }
       if (

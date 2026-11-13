@@ -15,6 +15,12 @@ export interface TelegramUser {
 
 export interface ParsedInitData {
   user: TelegramUser;
+  /**
+   * Чиїм токеном підписано initData: null — платформений бот (ідентичність
+   * довірена глобально); id майстра — бот цього майстра (ідентичність довірена
+   * ЛИШЕ в межах цього майстра, бо власник токена може підписати будь-який user.id).
+   */
+  botMasterId?: string | null;
   chat_instance?: string;
   chat_type?: string;
   auth_date: number;
@@ -56,7 +62,9 @@ export class TelegramAuthService {
       .update(dataCheckString)
       .digest('hex');
 
-    if (expectedHash !== hash) {
+    const a = Buffer.from(expectedHash, 'hex');
+    const b = Buffer.from(hash, 'hex');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       throw new UnauthorizedException('Невалідний підпис initData');
     }
 
@@ -93,7 +101,7 @@ export class TelegramAuthService {
   async validateAutoDetect(initData: string): Promise<ParsedInitData> {
     // Спроба 1: platform token
     try {
-      return this.validateWithPlatformToken(initData);
+      return { ...this.validateWithPlatformToken(initData), botMasterId: null };
     } catch {
       // не підійшов — пробуємо токен майстра
     }
@@ -116,7 +124,7 @@ export class TelegramAuthService {
       throw new UnauthorizedException('Невалідний підпис initData');
     }
 
-    return this.validate(initData, master.botToken);
+    return { ...this.validate(initData, master.botToken), botMasterId: master.id };
   }
 
   /**
@@ -128,7 +136,7 @@ export class TelegramAuthService {
     if (!master?.botToken) {
       throw new UnauthorizedException('Майстра не знайдено або бот не налаштований');
     }
-    return this.validate(initData, master.botToken);
+    return { ...this.validate(initData, master.botToken), botMasterId: master.id };
   }
 
   /**
