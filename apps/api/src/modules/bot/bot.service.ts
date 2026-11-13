@@ -8,6 +8,8 @@ import { Master, MasterStatus } from '../../database/entities/master.entity';
 import { BotRegistrationHandler } from './handlers/registration.handler';
 import { AppointmentCallbackHandler } from './handlers/appointment-callback.handler';
 import { ClientBotHandler } from './handlers/client-bot.handler';
+import { FunnelService, normalizeStartSource } from '../funnel/funnel.service';
+import { FunnelEventName } from '../../database/entities/funnel-event.entity';
 
 @Injectable()
 export class BotService implements OnModuleInit {
@@ -25,6 +27,7 @@ export class BotService implements OnModuleInit {
     private registrationHandler: BotRegistrationHandler,
     private appointmentCallbackHandler: AppointmentCallbackHandler,
     private clientBotHandler: ClientBotHandler,
+    private funnel: FunnelService,
   ) {}
 
   async onModuleInit() {
@@ -76,6 +79,11 @@ export class BotService implements OnModuleInit {
     const miniAppUrl = this.configService.get<string>('miniApp.url');
 
     this.platformBot.start(async (ctx) => {
+      // Крок 1 воронки. t.me/<bot>?start=tt_chaos → payload 'tt_chaos'.
+      // Telegraf 4.16: ctx.payload (ctx.startPayload — застаріла назва).
+      const payload = (ctx as any).payload ?? (ctx as any).startPayload;
+      void this.funnel.track(ctx.from?.id, FunnelEventName.BOT_START, normalizeStartSource(payload));
+
       await ctx.reply(
         '👋 Вітаємо в <b>BeatyBOT</b>!\n\n' +
         'Платформа для б\'юті-майстрів.\n\n' +

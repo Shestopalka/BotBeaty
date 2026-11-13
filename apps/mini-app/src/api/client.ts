@@ -41,6 +41,13 @@ api.interceptors.request.use((config) => {
 
 export default api;
 
+// ─── Воронка (аналітика онбордингу) ─────────────────────────────────────────
+// Fire-and-forget: помилка аналітики ніколи не має заважати онбордингу.
+export type FunnelClientEvent = 'onboarding_open' | 'onboarding_token_step';
+export const funnelApi = {
+  track: (event: FunnelClientEvent) => { api.post('/funnel/event', { event }).catch(() => {}); },
+};
+
 // ─── Masters ─────────────────────────────────────────────────────────────────
 export const mastersApi = {
   getById: (id: string) => api.get(`/masters/${id}`).then(r => r.data),
