@@ -3,30 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, IsNull, MoreThanOrEqual } from 'typeorm';
 import { Slot } from '../../database/entities/slot.entity';
 
-const SLOT_TIMEZONE = 'Europe/Kyiv';
-
-/** Зсув зони (мс) відносно UTC у конкретний момент — коректно враховує DST. */
-function tzOffsetMs(timeZone: string, atUtcMs: number): number {
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone, hour12: false,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
-  const p: any = Object.fromEntries(fmt.formatToParts(new Date(atUtcMs)).map(x => [x.type, x.value]));
-  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour === 24 ? 0 : +p.hour, +p.minute, +p.second);
-  return asUtc - atUtcMs;
-}
-
-/**
- * Перетворює "настінний" час у зоні (напр. 09:00 у Києві) на правильний UTC-момент,
- * враховуючи літній/зимовий час. Замінює хардкод +03:00, що ламався взимку.
- */
-function zonedWallTimeToUtc(dateStr: string, timeStr: string, timeZone = SLOT_TIMEZONE): Date {
-  const [y, mo, d] = dateStr.split('-').map(Number);
-  const [h, mi] = timeStr.split(':').map(Number);
-  const utcGuess = Date.UTC(y, mo - 1, d, h, mi, 0);
-  return new Date(utcGuess - tzOffsetMs(timeZone, utcGuess));
-}
+import { zonedWallTimeToUtc } from '../../common/time';
 
 export interface CreateSlotsDto {
   masterId: string;

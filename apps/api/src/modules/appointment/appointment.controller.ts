@@ -16,7 +16,7 @@ import {
   CurrentMasterId,
   OptionalMasterId,
 } from '../../common/decorators/current-master.decorator';
-import { TgUser } from '../../common/decorators/tg-user.decorator';
+import { TgUser, AuthBotMasterId } from '../../common/decorators/tg-user.decorator';
 import { TelegramUser } from '../auth/telegram-auth.service';
 
 // Статуси, які може виставляти лише майстер.
@@ -37,7 +37,13 @@ export class AppointmentController {
   create(
     @Body() dto: CreateAppointmentDto,
     @TgUser() user: TelegramUser,
+    @AuthBotMasterId() botMasterId: string | null = null,
   ) {
+    // initData, підписаний ботом майстра X, дає право записуватись лише до X —
+    // інакше власник бота X міг би записувати «від імені» будь-кого до інших майстрів.
+    if (botMasterId && dto.masterId !== botMasterId) {
+      throw new ForbiddenException('Запис можливий лише до майстра цього бота');
+    }
     return this.appointmentService.createAppointment({
       ...dto,
       clientTelegramId: String(user.id),
@@ -63,7 +69,7 @@ export class AppointmentController {
   ) {
     return this.appointmentService.getByMaster(
       masterId,
-      date ? new Date(date) : undefined,
+      date || undefined,
     );
   }
 
@@ -85,10 +91,12 @@ export class AppointmentController {
     @Body() body: { status: AppointmentStatus },
     @TgUser() user: TelegramUser,
     @OptionalMasterId() masterId: string | undefined,
+    @AuthBotMasterId() botMasterId: string | null = null,
   ) {
     if (body.status === AppointmentStatus.CANCELLED_CLIENT) {
-      // Клієнт скасовує власний запис — перевірка власності всередині сервісу.
-      return this.appointmentService.cancelByClient(id, String(user.id));
+      // Клієнт скасовує власний запис — перевірка власності всередині сервісу
+      // (і що запис належить майстру, чий бот підписав initData).
+      return this.appointmentService.cancelByClient(id, String(user.id), botMasterId);
     }
 
     if (!MASTER_STATUSES.has(body.status)) {

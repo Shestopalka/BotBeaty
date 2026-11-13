@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Check } from 'lucide-react';
 import { THEMES, ThemeName, applyTheme } from '../../themes';
-import api from '../../api/client';
+import api, { funnelApi } from '../../api/client';
 import { useTelegram } from '../../hooks/useTelegram';
 import { Illustration } from '../../components/Illustration';
 
@@ -44,6 +44,17 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [masterBotUsername, setMasterBotUsername] = useState('');
+
+  // Воронка: крок 2 — відкрив онбординг, крок 3 — дійшов до токена BotFather.
+  // Кожну подію шлемо раз за сеанс (view все одно рахує унікальних людей).
+  const tracked = useRef(new Set<string>());
+  useEffect(() => {
+    const ev = step === 'welcome' ? 'onboarding_open' : step === 'bot' ? 'onboarding_token_step' : null;
+    if (ev && !tracked.current.has(ev)) {
+      tracked.current.add(ev);
+      funnelApi.track(ev);
+    }
+  }, [step]);
 
   const stepIndex = STEPS.indexOf(step);
   const progressIndex = (PROGRESS_STEPS as Step[]).indexOf(step);

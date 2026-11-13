@@ -1,10 +1,10 @@
-import { Controller, Post, Get, Patch, Body, Param, Headers, UnauthorizedException, Res, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Headers, UnauthorizedException, Res, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { MasterService, RegisterMasterDto } from './master.service';
-import { TgUser } from '../../common/decorators/tg-user.decorator';
+import { TgUser, AuthBotMasterId } from '../../common/decorators/tg-user.decorator';
 import { TelegramUser } from '../auth/telegram-auth.service';
 import { Public } from '../../common/decorators/public.decorator';
-import { CurrentMasterId } from '../../common/decorators/current-master.decorator';
+import { CurrentMasterId, OptionalMasterId } from '../../common/decorators/current-master.decorator';
 
 @Controller('masters')
 export class MasterController {
@@ -13,13 +13,23 @@ export class MasterController {
   // telegramId беремо з автентифікованого користувача, а не з тіла —
   // інакше можна було б зареєструвати майстра від чужого Telegram ID.
   @Post('register')
-  register(@Body() dto: RegisterMasterDto, @TgUser() user: TelegramUser) {
+  register(
+    @Body() dto: RegisterMasterDto,
+    @TgUser() user: TelegramUser,
+    @AuthBotMasterId() botMasterId: string | null,
+  ) {
+    // Реєстрація — лише з платформеного бота (онбординг). initData з бота майстра
+    // може містити будь-який user.id (власник токена підписує що завгодно).
+    if (botMasterId) throw new ForbiddenException('Реєстрація доступна лише з основного бота');
     return this.masterService.register({ ...dto, telegramId: String(user.id) });
   }
 
   // Повертає профіль поточного авторизованого майстра за telegramId
   @Get('me')
-  findMe(@TgUser() user: TelegramUser) {
+  findMe(@TgUser() user: TelegramUser, @OptionalMasterId() masterId: string | undefined) {
+    // masterId виставляє guard лише коли ідентичність довірена (платформений бот
+    // або власний бот майстра). Інакше — «не майстер», навіть якщо telegramId збігся.
+    if (!masterId) throw new NotFoundException('Майстра не знайдено');
     return this.masterService.findByTelegramId(String(user.id));
   }
 

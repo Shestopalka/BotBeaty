@@ -15,6 +15,7 @@ import { Slot } from '../../database/entities/slot.entity';
 import { Client, ClientTag } from '../../database/entities/client.entity';
 import { Service } from '../../database/entities/service.entity';
 import { AuditLog, AuditAction } from '../../database/entities/audit-log.entity';
+import { kyivDateStr, kyivDayRange } from '../../common/time';
 
 export interface CreateAppointmentDto {
   masterTelegramId?: string;
@@ -400,6 +401,7 @@ export class AppointmentService {
   async cancelByClient(
     appointmentId: string,
     clientTelegramId: string,
+    botMasterId: string | null = null,
   ): Promise<Appointment> {
     return await this.dataSource.transaction(async (manager) => {
       const appointment = await manager.getRepository(Appointment).findOne({
@@ -409,6 +411,9 @@ export class AppointmentService {
 
       if (!appointment) throw new NotFoundException('Запис не знайдено');
       if (appointment.client?.telegramId !== clientTelegramId) {
+        throw new BadRequestException('Запис недоступний');
+      }
+      if (botMasterId && appointment.masterId !== botMasterId) {
         throw new BadRequestException('Запис недоступний');
       }
       if (
@@ -702,7 +707,7 @@ export class AppointmentService {
     return rows.map((r) => r.d);
   }
 
-  async getByMaster(masterId: string, date?: Date): Promise<Appointment[]> {
+  async getByMaster(masterId: string, date?: string): Promise<Appointment[]> {
     const qb = this.appointmentRepo
       .createQueryBuilder('apt')
       .leftJoinAndSelect('apt.client', 'client')
@@ -712,11 +717,14 @@ export class AppointmentService {
       .andWhere('apt.deletedAt IS NULL');
 
     if (date) {
-      const start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(date);
-      end.setHours(23, 59, 59, 999);
-      qb.andWhere('slot.startAt BETWEEN :start AND :end', { start, end });
+      // date — київська дата. Сервер у UTC, тож setHours дав би межі UTC-дня
+      // (записи 00:00–02:00 за Києвом потрапляли б в інший день).
+      const isDay = /^\d{4}-\d{2}-\d{2}$/.test(date);
+      const parsed = new Date(date);
+      if (!isDay && isNaN(parsed.getTime())) throw new BadRequestException('Некоректна дата');
+      const day = isDay ? date : kyivDateStr(parsed);
+      const { start, end } = kyivDayRange(day);
+      qb.andWhere('slot.startAt >= :start AND slot.startAt < :end', { start, end });
     }
 
     return qb.orderBy('slot.startAt', 'ASC').getMany();

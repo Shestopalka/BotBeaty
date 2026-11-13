@@ -7,9 +7,10 @@ import { MasterController } from './master.controller';
 import { SubscriptionScheduler } from './subscription.scheduler';
 import { BotModule } from '../bot/bot.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { FunnelModule } from '../funnel/funnel.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Master, Service]), BotModule, FeatureFlagsModule],
+  imports: [TypeOrmModule.forFeature([Master, Service]), BotModule, FeatureFlagsModule, FunnelModule],
   controllers: [MasterController],
   providers: [MasterService, SubscriptionScheduler],
   exports: [MasterService],

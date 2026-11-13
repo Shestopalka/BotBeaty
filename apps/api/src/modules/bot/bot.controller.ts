@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Req, HttpCode } from '@nestjs/common';
+import { Controller, Post, Param, Req, HttpCode, Headers, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { BotService } from './bot.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -13,7 +13,13 @@ export class BotController {
   @Public()
   @Post('webhook/platform')
   @HttpCode(200)
-  async platformWebhook(@Req() req: Request) {
+  async platformWebhook(
+    @Req() req: Request,
+    @Headers('x-telegram-bot-api-secret-token') secret?: string,
+  ) {
+    if (!this.botService.isValidWebhookSecret('platform', secret)) {
+      throw new UnauthorizedException();
+    }
     await this.botService.handlePlatformUpdate(req.body);
     return { ok: true };
   }
@@ -28,7 +34,12 @@ export class BotController {
   async masterWebhook(
     @Param('masterId') masterId: string,
     @Req() req: Request,
+    @Headers('x-telegram-bot-api-secret-token') secret?: string,
   ) {
+    // Без секрету будь-хто міг би надіслати фейковий апдейт (напр. confirm_apt).
+    if (!this.botService.isValidWebhookSecret(masterId, secret)) {
+      throw new UnauthorizedException();
+    }
     await this.botService.handleMasterUpdate(masterId, req.body);
     return { ok: true };
   }

@@ -172,10 +172,11 @@ export class ClientBotHandler {
    * Клієнт скасовує свій запис (кнопка «Скасувати» у «Мої записи»).
    * Бекенд перевіряє власність і ліміт скасування (cancellationHours).
    */
-  async handleCancelMyAppointment(ctx: any, appointmentId: string) {
+  async handleCancelMyAppointment(ctx: any, appointmentId: string, masterId: string) {
     const telegramId = String(ctx.from.id);
     try {
-      await this.appointmentService.cancelByClient(appointmentId, telegramId);
+      // masterId — бот, у якому натиснули кнопку: скасувати можна лише записи цього майстра.
+      await this.appointmentService.cancelByClient(appointmentId, telegramId, masterId);
       await ctx.answerCbQuery('Запис скасовано');
       await ctx.reply('❌ Ваш запис скасовано. Будемо раді бачити вас знову!');
     } catch (e: any) {

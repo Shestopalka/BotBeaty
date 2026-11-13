@@ -42,27 +42,26 @@ export class TelegramAuthGuard implements CanActivate {
       throw new UnauthorizedException('X-Telegram-Init-Data заголовок відсутній');
     }
 
+    let parsed;
     try {
       // Авто-детекція: platform token або token бота майстра
-      const parsed = await this.telegramAuth.validateAutoDetect(initData);
-      request.telegramUser = parsed.user;
-      await this.attachMaster(request);
-      return true;
+      parsed = await this.telegramAuth.validateAutoDetect(initData);
     } catch {
       // Можливо клієнт відкриває Mini App майстра — перевіряємо через X-Master-Id
       const masterId = request.headers['x-master-id'];
-      if (masterId) {
-        try {
-          const parsed = await this.telegramAuth.validateForClient(initData, masterId);
-          request.telegramUser = parsed.user;
-          await this.attachMaster(request);
-          return true;
-        } catch (clientErr) {
-          throw new UnauthorizedException(clientErr.message);
-        }
+      if (!masterId) throw new UnauthorizedException('Невалідний підпис initData');
+      try {
+        parsed = await this.telegramAuth.validateForClient(initData, String(masterId));
+      } catch (clientErr: any) {
+        throw new UnauthorizedException(clientErr?.message ?? 'Невалідний підпис initData');
       }
-      throw new UnauthorizedException('Невалідний підпис initData');
     }
+
+    request.telegramUser = parsed.user;
+    // null/undefined — платформений бот; інакше id майстра, чий бот підписав initData.
+    request.authBotMasterId = parsed.botMasterId ?? null;
+    await this.attachMaster(request);
+    return true;
   }
 
   /**
@@ -73,7 +72,16 @@ export class TelegramAuthGuard implements CanActivate {
   private async attachMaster(request: any): Promise<void> {
     const telegramId = request.telegramUser?.id;
     if (!telegramId) return;
-    request.masterId =
+    const resolved =
       (await this.telegramAuth.findMasterIdByTelegramId(String(telegramId))) ?? undefined;
+    // initData, підписаний ботом майстра X, доводить лише те, що X так сказав.
+    // Власник токена може вписати будь-який user.id — тож права майстра даємо
+    // тільки якщо цей бот належить саме йому. Інакше майстер A підписав би
+    // initData з telegramId майстра B і отримав би доступ до його кабінету.
+    if (request.authBotMasterId && resolved !== request.authBotMasterId) {
+      request.masterId = undefined;
+      return;
+    }
+    request.masterId = resolved;
   }
 }

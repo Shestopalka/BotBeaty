@@ -2,11 +2,14 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { createHash, timingSafeEqual } from 'crypto';
 import { Telegraf } from 'telegraf';
 import { Master, MasterStatus } from '../../database/entities/master.entity';
 import { BotRegistrationHandler } from './handlers/registration.handler';
 import { AppointmentCallbackHandler } from './handlers/appointment-callback.handler';
 import { ClientBotHandler } from './handlers/client-bot.handler';
+import { FunnelService, normalizeStartSource } from '../funnel/funnel.service';
+import { FunnelEventName } from '../../database/entities/funnel-event.entity';
 
 @Injectable()
 export class BotService implements OnModuleInit {
@@ -24,6 +27,7 @@ export class BotService implements OnModuleInit {
     private registrationHandler: BotRegistrationHandler,
     private appointmentCallbackHandler: AppointmentCallbackHandler,
     private clientBotHandler: ClientBotHandler,
+    private funnel: FunnelService,
   ) {}
 
   async onModuleInit() {
@@ -60,7 +64,9 @@ export class BotService implements OnModuleInit {
 
     const webhookUrl = this.configService.get<string>('telegram.webhookBaseUrl');
     if (webhookUrl) {
-      await this.platformBot.telegram.setWebhook(`${webhookUrl}/api/v1/bot/webhook/platform`);
+      await this.platformBot.telegram.setWebhook(`${webhookUrl}/api/v1/bot/webhook/platform`, {
+        secret_token: webhookSecretFor(token),
+      });
       this.logger.log('Platform bot webhook встановлено');
     } else {
       await this.platformBot.telegram.deleteWebhook({ drop_pending_updates: true });
@@ -73,6 +79,11 @@ export class BotService implements OnModuleInit {
     const miniAppUrl = this.configService.get<string>('miniApp.url');
 
     this.platformBot.start(async (ctx) => {
+      // Крок 1 воронки. t.me/<bot>?start=tt_chaos → payload 'tt_chaos'.
+      // Telegraf 4.16: ctx.payload (ctx.startPayload — застаріла назва).
+      const payload = (ctx as any).payload ?? (ctx as any).startPayload;
+      void this.funnel.track(ctx.from?.id, FunnelEventName.BOT_START, normalizeStartSource(payload));
+
       await ctx.reply(
         '👋 Вітаємо в <b>BeatyBOT</b>!\n\n' +
         'Платформа для б\'юті-майстрів.\n\n' +
@@ -140,7 +151,9 @@ export class BotService implements OnModuleInit {
 
     const webhookUrl = this.configService.get<string>('telegram.webhookBaseUrl');
     if (webhookUrl) {
-      await tempBot.telegram.setWebhook(`${webhookUrl}/api/v1/bot/webhook/${master.id}`);
+      await tempBot.telegram.setWebhook(`${webhookUrl}/api/v1/bot/webhook/${master.id}`, {
+        secret_token: webhookSecretFor(botToken),
+      });
     }
 
     await this.startMasterBot(master);
@@ -202,6 +215,7 @@ export class BotService implements OnModuleInit {
         await bot.telegram
           .setWebhook(`${webhookUrl}/api/v1/bot/webhook/${master.id}`, {
             drop_pending_updates: true,
+            secret_token: webhookSecretFor(master.botToken),
           })
           .catch(e => this.logger.warn(`Не вдалось оновити webhook майстра: ${e.message}`));
       } else {
@@ -309,7 +323,7 @@ export class BotService implements OnModuleInit {
           return;
         }
         if (data.startsWith('cancel_my_apt:')) {
-          await this.clientBotHandler.handleCancelMyAppointment(ctx, data.split(':')[1]);
+          await this.clientBotHandler.handleCancelMyAppointment(ctx, data.split(':')[1], master.id);
           return;
         }
         // Кнопки для майстра (confirm/cancel/complete)
@@ -318,6 +332,12 @@ export class BotService implements OnModuleInit {
           data.startsWith('cancel_apt:') ||
           data.startsWith('complete_apt:')
         ) {
+          // Ці кнопки — лише для майстра. Без перевірки клієнт міг би сам
+          // підтвердити/завершити свій запис (callback_data легко підробити).
+          if (String(ctx.from?.id) !== String(master.telegramId)) {
+            await ctx.answerCbQuery('Недостатньо прав').catch(() => {});
+            return;
+          }
           await this.appointmentCallbackHandler.handle(ctx, master.id);
           return;
         }
@@ -381,6 +401,20 @@ export class BotService implements OnModuleInit {
 
   // ─── Webhook routing ──────────────────────────────────────────────────────
 
+  /**
+   * Перевіряє заголовок X-Telegram-Bot-Api-Secret-Token вебхука.
+   * Секрет виводиться з токена бота — його знають лише сервер і Telegram.
+   */
+  isValidWebhookSecret(target: 'platform' | string, header: string | undefined): boolean {
+    const token = target === 'platform'
+      ? this.configService.get<string>('telegram.platformBotToken')
+      : (this.masterBots.get(target) as any)?.telegram?.token;
+    if (!token || !header) return false;
+    const a = Buffer.from(webhookSecretFor(token));
+    const b = Buffer.from(String(header));
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
   async handlePlatformUpdate(update: any) {
     if (this.platformBot) await this.platformBot.handleUpdate(update);
   }
@@ -435,4 +469,9 @@ export class BotService implements OnModuleInit {
   }
 
   getPlatformBot(): Telegraf { return this.platformBot; }
+}
+
+/** secret_token для setWebhook: 1–256 символів [A-Za-z0-9_-]. Похідний від токена бота. */
+export function webhookSecretFor(botToken: string): string {
+  return createHash('sha256').update(`beatybot-webhook:${botToken}`).digest('hex');
 }

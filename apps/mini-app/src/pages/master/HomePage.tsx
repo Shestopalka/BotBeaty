@@ -7,6 +7,7 @@ import { useMaster } from '../../context/MasterContext';
 import { Avatar } from '../../components/Avatar';
 import { appointmentsApi, analyticsApi, mastersApi, slotsApi } from '../../api/client';
 import { addDays, startOfDay } from 'date-fns';
+import { kyivIso, kyivNow, kyivToday, toKyiv } from '../../lib/time';
 
 interface Apt {
   id: string;
@@ -41,7 +42,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!masterId) return;
-    const date = format(new Date(), 'yyyy-MM-dd');
+    const date = format(kyivNow(), 'yyyy-MM-dd');
     appointmentsApi.getByMaster(masterId, date).then(setToday).catch(() => setToday([]));
     analyticsApi.getDashboard(masterId)
       .then((d) => setRevenue(d?.revenueThisMonth ?? 0))
@@ -52,8 +53,8 @@ export default function HomePage() {
       .catch(() => {});
     // Рахуємо слоти від ПОЧАТКУ сьогодні (а не від поточного моменту),
     // щоб сьогоднішні слоти лічились навіть якщо їх час уже минув.
-    const from = startOfDay(new Date()).toISOString();
-    const to = addDays(new Date(), 30).toISOString();
+    const from = kyivIso(kyivToday());
+    const to = kyivIso(addDays(kyivToday(), 31));
     slotsApi.getForMaster(masterId, from, to)
       .then((s) => setSlotsCount(Array.isArray(s) ? s.length : 0))
       .catch(() => setSlotsCount(0));
@@ -99,7 +100,7 @@ export default function HomePage() {
             Вітаю, {firstName}
           </p>
           <p className="text-xs capitalize" style={{ color: 'var(--tg-theme-hint-color)' }}>
-            {format(new Date(), 'EEEE, d MMMM', { locale: uk })}
+            {format(kyivNow(), 'EEEE, d MMMM', { locale: uk })}
           </p>
         </div>
       </div>
@@ -169,7 +170,7 @@ export default function HomePage() {
           <p className="text-xs" style={{ color: 'var(--tg-theme-link-color)' }}>Найближчий запис</p>
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--tg-theme-text-color)' }}>
             {next
-              ? `${next.service?.name ?? 'Послуга'} · ${next.client?.fullName ?? 'Клієнт'} · ${format(new Date(next.slot!.startAt!), 'HH:mm')}`
+              ? `${next.service?.name ?? 'Послуга'} · ${next.client?.fullName ?? 'Клієнт'} · ${format(toKyiv(next.slot!.startAt!), 'HH:mm')}`
               : 'На сьогодні вільно'}
           </p>
         </div>

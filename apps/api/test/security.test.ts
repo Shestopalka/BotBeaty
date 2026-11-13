@@ -157,3 +157,97 @@ test('findPublicById: never leaks botToken', async () => {
   assert.equal(res.botWebhookUrl, undefined);
   assert.ok('fullName' in res);
 });
+
+// ════════════ IMPERSONATION: initData signed by ANOTHER master's bot ════════════
+test('guard: initData signed by master A bot claiming master B id → NO master access', async () => {
+  // Майстер A підписав своїм токеном initData з telegramId майстра B (777).
+  const auth = {
+    validateAutoDetect: async () => { throw new Error('bad sig'); },
+    validateForClient: async () => ({ user: { id: 777 }, botMasterId: 'master-A' }),
+    findMasterIdByTelegramId: async (tid: string) => (tid === '777' ? 'master-B' : null),
+  };
+  const guard = new TelegramAuthGuard(auth as any, reflector(false));
+  const req: any = { headers: { 'x-telegram-init-data': 'forged', 'x-master-id': 'master-A' } };
+  assert.equal(await guard.canActivate(ctx(req)), true);
+  assert.equal(req.masterId, undefined); // раніше тут був 'master-B'
+  assert.equal(req.authBotMasterId, 'master-A');
+});
+
+test('guard: master opening OWN bot keeps master access', async () => {
+  const auth = {
+    validateAutoDetect: async () => ({ user: { id: 777 }, botMasterId: 'master-B' }),
+    findMasterIdByTelegramId: async () => 'master-B',
+  };
+  const guard = new TelegramAuthGuard(auth as any, reflector(false));
+  const req: any = { headers: { 'x-telegram-init-data': 'sig' } };
+  await guard.canActivate(ctx(req));
+  assert.equal(req.masterId, 'master-B');
+});
+
+test('guard: platform-signed initData → trusted master access', async () => {
+  const auth = {
+    validateAutoDetect: async () => ({ user: { id: 777 }, botMasterId: null }),
+    findMasterIdByTelegramId: async () => 'master-B',
+  };
+  const guard = new TelegramAuthGuard(auth as any, reflector(false));
+  const req: any = { headers: { 'x-telegram-init-data': 'sig' } };
+  await guard.canActivate(ctx(req));
+  assert.equal(req.masterId, 'master-B');
+  assert.equal(req.authBotMasterId, null);
+});
+
+test('create: client signed by bot of master A cannot book master B', async () => {
+  const { ctrl } = makeApptController();
+  await assert.rejects(
+    async () => ctrl.create({ masterId: 'master-B', serviceId: 's', slotId: 'sl' } as any, { id: 1, first_name: 'X' } as any, 'master-A'),
+    ForbiddenException,
+  );
+});
+
+test('create: client signed by bot of master A can book master A', async () => {
+  const { ctrl, calls } = makeApptController();
+  await ctrl.create({ masterId: 'master-A', serviceId: 's', slotId: 'sl' } as any, { id: 1, first_name: 'X' } as any, 'master-A');
+  assert.equal(calls.create.masterId, 'master-A');
+});
+
+test('client cancel passes bot scope to service', async () => {
+  const svc: any = { cancelByClient: async (...a: any[]) => { svc.args = a; return {}; } };
+  const ctrl = new AppointmentController(svc);
+  await ctrl.updateStatus('apt1', { status: AppointmentStatus.CANCELLED_CLIENT }, { id: 42 } as any, undefined, 'master-A');
+  assert.deepEqual(svc.args, ['apt1', '42', 'master-A']);
+});
+
+// ════════════ BOT WEBHOOK SECRET ════════════
+import { BotService, webhookSecretFor } from '../src/modules/bot/bot.service';
+
+test('webhook: secret required and must match bot token', () => {
+  const svc: any = Object.create(BotService.prototype);
+  svc.masterBots = new Map([['m1', { telegram: { token: 'TOKEN-1' } }]]);
+  svc.configService = { get: () => 'PLATFORM-TOKEN' };
+  assert.equal(svc.isValidWebhookSecret('m1', undefined), false);
+  assert.equal(svc.isValidWebhookSecret('m1', 'wrong'), false);
+  assert.equal(svc.isValidWebhookSecret('m1', webhookSecretFor('TOKEN-2')), false);
+  assert.equal(svc.isValidWebhookSecret('m1', webhookSecretFor('TOKEN-1')), true);
+  assert.equal(svc.isValidWebhookSecret('unknown', webhookSecretFor('TOKEN-1')), false);
+  assert.equal(svc.isValidWebhookSecret('platform', webhookSecretFor('PLATFORM-TOKEN')), true);
+  assert.match(webhookSecretFor('x'), /^[A-Za-z0-9_-]{1,256}$/);
+});
+
+// ════════════ initData signature: real HMAC, constant-time compare ════════════
+import { TelegramAuthService } from '../src/modules/auth/telegram-auth.service';
+import * as nodeCrypto from 'crypto';
+
+function signInitData(botToken: string, fields: Record<string, string>) {
+  const dcs = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join('\n');
+  const secret = nodeCrypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const hash = nodeCrypto.createHmac('sha256', secret).update(dcs).digest('hex');
+  return new URLSearchParams({ ...fields, hash }).toString();
+}
+
+test('validate: correct signature passes, other token / garbage hash fails', () => {
+  const svc = new TelegramAuthService({} as any, {} as any);
+  const fields = { auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: 5, first_name: 'A' }) };
+  assert.equal(svc.validate(signInitData('T1', fields), 'T1').user.id, 5);
+  assert.throws(() => svc.validate(signInitData('T2', fields), 'T1'), UnauthorizedException);
+  assert.throws(() => svc.validate(new URLSearchParams({ ...fields, hash: 'zz' }).toString(), 'T1'), UnauthorizedException);
+});

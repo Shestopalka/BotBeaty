@@ -11,6 +11,8 @@ import { AuditLog } from '../../database/entities/audit-log.entity';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { BotService } from '../bot/bot.service';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { FunnelService } from '../funnel/funnel.service';
+import { FunnelEventName } from '../../database/entities/funnel-event.entity';
 
 export interface RegisterMasterDto {
   telegramId: string;
@@ -32,6 +34,7 @@ export class MasterService {
     @InjectDataSource()
     private dataSource: DataSource,
     private featureFlags: FeatureFlagsService,
+    private funnel?: FunnelService,
   ) {}
 
   async register(dto: RegisterMasterDto): Promise<Partial<Master>> {
@@ -80,6 +83,9 @@ export class MasterService {
 
     // Запускаємо бота (поза транзакцією — може зайняти час)
     await this.botService.activateMasterBot(saved);
+
+    // Крок 4 воронки — майстер створений (track ніколи не кидає).
+    await this.funnel?.track(saved.telegramId, FunnelEventName.REGISTERED);
 
     return this.sanitize(await this.findEntityById(saved.id));
   }

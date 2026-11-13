@@ -14,6 +14,7 @@ import { BotMasterMenuHandler } from './handlers/master-menu.handler';
 import { AppointmentCallbackHandler } from './handlers/appointment-callback.handler';
 import { ClientBotHandler } from './handlers/client-bot.handler';
 import { AppointmentModule } from '../appointment/appointment.module';
+import { FunnelModule } from '../funnel/funnel.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AppointmentModule } from '../appointment/appointment.module';
     ConfigModule,
     BullModule.registerQueue({ name: 'notifications' }),
     AppointmentModule,
+    FunnelModule,
   ],
   controllers: [BotController],
   providers: [
