@@ -1,0 +1,1574 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BeatyBOTI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201024%201024%22%3E%3Crect%20width%3D%221024%22%20height%3D%221024%22%20rx%3D%22232%22%20fill%3D%22%23D35580%22/%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M532%20205L602%20442L838%20512L602%20582L532%20818L462%20582L226%20512L462%20442Z%22/%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M276%20205L300%20283L378%20307L300%20331L276%20410L252%20331L175%20307L252%20283Z%22/%3E%3C/svg%3E">
+<meta name="description" content="BeatyBOTI — онлайн-запис, нагадування клієнтам і розклад для бʼюті-майстрів у власному Telegram-боті.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: темна «нічна вітрина салону» — скляні картки на сітці з рожевим світлом; світла версія = тема Dusty Rose */
+:root{
+  /* Deep Mauve (тема застосунку) — основний вигляд сайту; інші 4 теми вмикаються в «П'ять тем» */
+  --bg:#150810;
+  --bg-2:#1b0b16;
+  --surface:#200d1a;
+  --fg:#f5e0ee;
+  --muted:#c7a2b9;
+  --hint:#e8a0c8;
+  --accent:#c860a8;
+  --accent-2:#9b6fd8;
+  --accent-3:#e8a0c8;
+  --on-accent:#ffffff;
+  --glass:rgba(255,255,255,.035);
+  --glass-strong:rgba(255,255,255,.06);
+  --line:rgba(255,255,255,.09);
+  --line-strong:rgba(255,255,255,.18);
+  --grid:rgba(245,224,238,.05);
+  --glow-a:rgba(200,96,168,.32);
+  --glow-b:rgba(155,111,216,.24);
+  --glow-c:rgba(232,160,200,.14);
+  --shadow:0 30px 80px -30px rgba(0,0,0,.7);
+  --grad-text:linear-gradient(100deg,#f5e0ee 0%,#e8a0c8 38%,#c860a8 70%,#9b6fd8 100%);
+  --ok:#7fd4a8;
+  --mark:rgba(200,96,168,.18);
+
+  --f-display:"Unbounded","Manrope",system-ui,sans-serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --r-lg:28px; --r-md:20px; --r-sm:14px;
+  --wrap:1180px;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:var(--f-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--bg)}
+a{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+h1,h2,h3{font-family:var(--f-display);letter-spacing:-.035em;line-height:1.02;margin:0;text-wrap:balance}
+p{margin:0}
+
+/* ── Атмосфера: сітка + світлові плями ───────────────────────── */
+.atmo{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.atmo::before{
+  content:"";position:absolute;inset:-2px;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 20%,#000 30%,transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 20%,#000 30%,transparent 80%);
+}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);will-change:transform}
+.blob.a{width:620px;height:620px;background:var(--glow-a);top:-180px;left:-140px;animation:drift1 22s ease-in-out infinite}
+.blob.b{width:560px;height:560px;background:var(--glow-b);top:20%;right:-180px;animation:drift2 26s ease-in-out infinite}
+.blob.c{width:480px;height:480px;background:var(--glow-c);bottom:-200px;left:30%;animation:drift3 30s ease-in-out infinite}
+@keyframes drift1{50%{transform:translate(120px,80px) scale(1.1)}}
+@keyframes drift2{50%{transform:translate(-100px,120px) scale(.92)}}
+@keyframes drift3{50%{transform:translate(-80px,-90px) scale(1.08)}}
+
+.wrap{
+  position:relative;z-index:1;max-width:var(--wrap);margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+@media (min-width:720px){.wrap{padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}}
+
+/* ── Floating navbar ─────────────────────────────────────────── */
+.nav{
+  position:fixed;z-index:50;left:50%;transform:translateX(-50%);
+  top:calc(14px + env(safe-area-inset-top,0px));
+  width:min(960px,calc(100% - 2 * max(16px,env(safe-area-inset-left,0px))));
+  display:flex;align-items:center;gap:8px;padding:8px 8px 8px 18px;
+  border-radius:999px;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 62%,transparent);
+  backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+  box-shadow:var(--shadow);
+}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:-.03em;white-space:nowrap}
+.logo-mark{width:32px;height:32px;flex:none;display:block;border-radius:9px;box-shadow:0 6px 20px -4px rgba(211,85,128,.55);transition:transform .4s cubic-bezier(.3,1.4,.5,1)}
+.logo-mark svg{width:100%;height:100%;display:block}
+.logo:hover .logo-mark{transform:rotate(-8deg) scale(1.06)}
+.nav-links{display:none;gap:2px;margin-left:auto}
+.nav-links button{background:none;border:0;padding:9px 14px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);transition:color .2s,background .2s}
+.nav-links button:hover{color:var(--fg);background:var(--glass-strong)}
+.nav-links button[aria-current="page"]{color:var(--fg);background:var(--glass-strong)}
+.nav-cta{margin-left:auto}
+@media (min-width:900px){.nav-links{display:flex}.nav-cta{margin-left:6px}.burger{display:none!important}}
+.burger{margin-left:6px;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--glass);display:grid;place-items:center}
+.burger svg{width:18px;height:18px}
+.menu{
+  position:fixed;z-index:49;left:50%;transform:translateX(-50%) translateY(-8px);
+  top:calc(80px + env(safe-area-inset-top,0px));
+  width:min(960px,calc(100% - 2 * max(16px,env(safe-area-inset-left,0px))));
+  padding:10px;border-radius:24px;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  display:grid;gap:4px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+}
+.menu.open{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+.menu button{background:none;border:0;text-align:left;padding:14px 16px;border-radius:14px;font-weight:600;font-size:16px}
+.menu button:hover,.menu button[aria-current="page"]{background:var(--glass-strong)}
+
+/* ── Кнопки ──────────────────────────────────────────────────── */
+.btn{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  padding:14px 22px;border-radius:999px;border:0;text-decoration:none;
+  font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;isolation:isolate;
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;
+}
+.btn-sm{padding:10px 16px;font-size:14px}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent);box-shadow:0 10px 30px -8px var(--glow-a)}
+.btn-primary::after{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.45) 50%,transparent 70%);
+  transform:translateX(-120%);animation:sheen 3.6s ease-in-out infinite;
+}
+@keyframes sheen{0%,55%{transform:translateX(-120%)}85%,100%{transform:translateX(120%)}}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 40px -8px var(--glow-a)}
+.btn-ghost{background:var(--glass);border:1px solid var(--line-strong);color:var(--fg);backdrop-filter:blur(10px)}
+.btn-ghost:hover{background:var(--glass-strong);transform:translateY(-2px)}
+.btn svg{width:18px;height:18px;flex:none}
+
+/* ── Загальні секції ─────────────────────────────────────────── */
+main{position:relative;z-index:1}
+.page{display:none}
+.page.active{display:block;animation:pageIn .6s cubic-bezier(.2,.8,.2,1)}
+@keyframes pageIn{from{opacity:.0;transform:translateY(14px)}to{opacity:1;transform:none}}
+section{padding-block:clamp(64px,10vw,120px)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--hint)}
+.eyebrow::before{content:"";width:18px;height:1px;background:currentColor;opacity:.6}
+.h2{font-size:clamp(32px,5.4vw,64px);font-weight:800;margin-top:14px}
+.grad{background:var(--grad-text);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:clamp(16px,1.6vw,19px);color:var(--muted);max-width:60ch;margin-top:18px}
+.sec-head{display:grid;gap:4px;margin-bottom:clamp(36px,5vw,56px)}
+
+/* Поява секцій при скролі (scroll-driven, без JS; без підтримки — просто видно) */
+@supports (animation-timeline: view()){
+  .reveal{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 45%}
+  @keyframes rise{from{opacity:.15;transform:translateY(48px) scale(.98)}to{opacity:1;transform:none}}
+}
+
+/* ── Скляні картки + спотлайт ────────────────────────────────── */
+.glass{
+  position:relative;border-radius:var(--r-lg);
+  background:var(--glass);border:1px solid var(--line);
+  backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
+  overflow:hidden;isolation:isolate;
+  transition:border-color .3s,transform .4s cubic-bezier(.2,.8,.2,1);
+}
+.spot::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:0;transition:opacity .35s;
+  background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),var(--mark),transparent 60%);
+}
+.spot::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;opacity:0;transition:opacity .35s;
+  background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),var(--accent),transparent 65%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+.spot:hover::before,.spot:hover::after{opacity:1}
+.spot:hover{border-color:var(--line-strong)}
+
+/* ── HERO ────────────────────────────────────────────────────── */
+.hero{padding-top:calc(130px + env(safe-area-inset-top,0px));padding-bottom:clamp(40px,6vw,80px)}
+.hero-grid{display:grid;gap:56px;align-items:center}
+@media (min-width:980px){.hero-grid{grid-template-columns:1.15fr .85fr;gap:40px}}
+.badge{
+  display:inline-flex;align-items:center;gap:10px;padding:7px 14px 7px 8px;border-radius:999px;
+  border:1px solid var(--line-strong);background:var(--glass);font-size:13px;font-weight:600;
+  backdrop-filter:blur(10px);position:relative;overflow:hidden;
+}
+.badge b{display:inline-grid;place-items:center;padding:3px 9px;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.badge::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.18) 50%,transparent 65%);transform:translateX(-100%);animation:sheen 4.5s ease-in-out 1s infinite}
+.hero-copy{container-type:inline-size;min-width:0}
+/* Усі фрази стоять в одній клітинці сітки — висота = найвища фраза, сторінка не стрибає */
+.rot{display:grid;margin-top:26px;font-size:clamp(34px,9.2cqi,92px);font-weight:800;letter-spacing:-.05em;line-height:1}
+.rot .ph-line{grid-area:1/1;align-self:start;visibility:hidden}
+.rot .ph-line.is-on,.rot .ph-line.is-out{visibility:visible}
+.rot em{font-style:normal;background:var(--grad-text);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rot .w{display:inline-block;white-space:nowrap}
+.rot .is-on .w{animation:wordIn .8s cubic-bezier(.2,.8,.2,1) both}
+.rot .is-out .w{animation:wordOut .5s cubic-bezier(.6,0,.8,.4) both}
+@keyframes wordIn{from{opacity:0;transform:translateY(.45em) rotate(3deg);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+@keyframes wordOut{to{opacity:0;transform:translateY(-.35em);filter:blur(6px)}}
+.rot-dots{display:flex;gap:8px;margin-top:22px}
+.rot-dots button{width:28px;height:4px;padding:0;border:0;border-radius:4px;background:var(--line-strong);position:relative;overflow:hidden}
+.rot-dots button[aria-selected="true"]::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transform-origin:left;animation:dotFill var(--rot-ms,3600ms) linear both}
+@keyframes dotFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.hero .lead{font-size:clamp(17px,1.8vw,21px)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+.hero-note{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:28px;color:var(--muted);font-size:14px}
+.hero-note span{display:inline-flex;align-items:center;gap:8px}
+.hero-note svg{width:16px;height:16px;color:var(--ok)}
+
+/* Телефон-демо */
+.stage{position:relative;display:grid;justify-items:center;gap:22px;perspective:1400px}
+.orbit{position:absolute;width:min(520px,100%);aspect-ratio:1;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-54%);pointer-events:none}
+.orbit::before,.orbit::after{content:"";position:absolute;inset:0;border-radius:50%;border:1px dashed var(--line-strong);animation:spin 60s linear infinite}
+.orbit::after{inset:14%;border-style:solid;border-color:var(--line);animation-duration:40s;animation-direction:reverse}
+.orbit i{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 18px 4px var(--glow-a);top:-5px;left:calc(50% - 5px)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.core{position:absolute;width:280px;height:280px;border-radius:50%;top:46%;left:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,var(--glow-a),transparent 65%);animation:pulse 4s ease-in-out infinite;pointer-events:none}
+@keyframes pulse{50%{transform:translate(-50%,-50%) scale(1.25);opacity:.6}}
+
+.phone{
+  --p-bg:#1a0a0e;--p-bg2:#2d1018;--p-fg:#fdf0f2;--p-hint:#f9c6d0;--p-btn:#e8748a;
+  position:relative;width:min(330px,100%);border-radius:44px;padding:10px;
+  background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.04));
+  box-shadow:0 50px 100px -30px rgba(0,0,0,.65),0 0 0 1px var(--line-strong);
+  transform-style:preserve-3d;transition:transform .25s ease-out;will-change:transform;
+}
+.screen{position:relative;border-radius:36px;overflow:hidden;background:var(--p-bg);color:var(--p-fg);height:560px;display:flex;flex-direction:column;transition:background .5s,color .5s}
+.notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:96px;height:26px;border-radius:20px;background:#000;z-index:3}
+.chat-head{display:flex;align-items:center;gap:10px;padding:46px 16px 12px;background:var(--p-bg2);transition:background .5s}
+.ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--p-btn),var(--accent-2));color:#fff;font-weight:800;font-size:15px;flex:none}
+.chat-head strong{display:block;font-size:14px;line-height:1.2}
+.chat-head small{font-size:12px;color:var(--p-hint);opacity:.85}
+.chat{flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
+  background-image:radial-gradient(circle at 20% 20%,color-mix(in srgb,var(--p-btn) 14%,transparent),transparent 40%),radial-gradient(circle at 80% 70%,color-mix(in srgb,var(--p-btn) 10%,transparent),transparent 45%)}
+.day{align-self:center;font-size:11px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--p-fg) 10%,transparent)}
+.msg{background:var(--p-bg2);border-radius:18px 18px 18px 6px;padding:12px 14px;font-size:13px;line-height:1.5;box-shadow:0 6px 18px -10px rgba(0,0,0,.6);transition:background .5s;animation:msgIn .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes msgIn{from{opacity:0;transform:translateY(14px) scale(.96)}}
+.msg .t{font-weight:800;font-size:13.5px}
+.msg .sep{opacity:.35;letter-spacing:-1px;overflow:hidden;white-space:nowrap}
+.msg .row{display:flex;gap:6px}
+.msg .lnk{color:var(--p-hint);text-decoration:underline;text-underline-offset:2px}
+.msg .foot{font-style:italic;opacity:.85}
+.msg .time{display:block;text-align:right;font-size:10.5px;opacity:.5;margin-top:4px}
+.kb{display:grid;gap:5px;margin-top:-4px;animation:msgIn .6s .15s cubic-bezier(.2,.8,.2,1) both}
+.kb-row{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:5px}
+.kb button{border:0;border-radius:12px;padding:9px 6px;font-size:12px;font-weight:700;color:var(--p-fg);background:color-mix(in srgb,var(--p-bg2) 70%,var(--p-btn) 30%);transition:transform .15s,background .3s}
+.kb button:hover{background:color-mix(in srgb,var(--p-bg2) 45%,var(--p-btn) 55%)}
+.kb button:active{transform:scale(.96)}
+.kb button.pulse{animation:btnPulse 1.8s ease-in-out infinite}
+@keyframes btnPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--p-btn) 45%,transparent)}}
+.toast{position:absolute;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;padding:9px 14px;border-radius:999px;background:var(--p-fg);color:var(--p-bg);font-size:12px;font-weight:700;white-space:nowrap;transition:all .35s cubic-bezier(.2,.8,.2,1);z-index:4}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.themes{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(10px);font-size:12px;color:var(--muted);position:relative;z-index:2}
+.themes button{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:0;transition:transform .2s,border-color .2s}
+.themes button:hover{transform:scale(1.15)}
+.themes button[aria-pressed="true"]{border-color:var(--fg)}
+.demo-hint{font-size:12px;color:var(--muted);text-align:center;position:relative;z-index:2}
+
+/* ── Marquee ─────────────────────────────────────────────────── */
+.marquee{padding-block:28px;border-block:1px solid var(--line);overflow:hidden;position:relative;z-index:1;
+  mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.track{display:flex;width:max-content;gap:0;animation:marq 38s linear infinite}
+.marquee:hover .track{animation-play-state:paused}
+.track span{display:inline-flex;align-items:center;gap:22px;padding-right:22px;font-family:var(--f-display);font-weight:600;font-size:clamp(20px,2.6vw,30px);letter-spacing:-.03em;color:var(--muted);white-space:nowrap}
+.track span::after{content:"✦";font-size:.6em;color:var(--accent)}
+@keyframes marq{to{transform:translateX(-50%)}}
+
+/* ── Bento ───────────────────────────────────────────────────── */
+.bento{display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:760px){.bento{grid-template-columns:repeat(6,1fr)}
+  .b-1{grid-column:span 4}.b-2{grid-column:span 2}.b-3{grid-column:span 2}.b-4{grid-column:span 2}.b-5{grid-column:span 2}.b-6{grid-column:span 3}.b-7{grid-column:span 3}}
+.card{padding:26px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card h3{font-size:clamp(20px,2vw,24px);font-weight:600;letter-spacing:-.03em;line-height:1.15}
+.card p{color:var(--muted);font-size:15px}
+.ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--glass-strong);border:1px solid var(--line);color:var(--accent)}
+.ico svg{width:22px;height:22px}
+.viz{margin-top:auto;padding-top:8px;min-width:0}
+
+/* bot name typer */
+.botname{font-family:var(--f-mono);font-size:clamp(16px,2.2vw,22px);padding:16px 18px;border-radius:var(--r-sm);background:var(--glass-strong);border:1px solid var(--line);display:flex;align-items:center;gap:10px;overflow:hidden;white-space:nowrap}
+.botname .at{color:var(--accent)}
+.caret{width:2px;height:1.1em;background:var(--accent);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--glass);color:var(--muted)}
+
+/* reminders timeline */
+.tl{position:relative;height:74px}
+.tl::before{content:"";position:absolute;left:0;right:0;top:36px;height:2px;background:linear-gradient(90deg,var(--line-strong),var(--accent))}
+.tl .pt{position:absolute;top:24px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--bg-2);border:1px solid var(--line-strong);font-size:12px}
+.tl .pt.ring{animation:ring 2.4s ease-in-out infinite}
+.tl .pt.ring:nth-of-type(2){animation-delay:1.2s}
+.tl .lab{position:absolute;top:56px;font-family:var(--f-mono);font-size:11px;color:var(--muted);transform:translateX(-25%)}
+.tl .go{position:absolute;right:0;top:20px;padding:5px 10px;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-size:11px;font-weight:700}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 var(--glow-a)}50%{box-shadow:0 0 0 10px transparent;transform:rotate(-12deg)}}
+
+/* slots */
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.slot{font-family:var(--f-mono);font-size:11.5px;text-align:center;padding:8px 0;border-radius:10px;border:1px solid var(--line);color:var(--muted);transition:all .4s}
+.slot.on{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;transform:scale(1.04)}
+
+/* chart */
+.chart{display:flex;align-items:flex-end;gap:7px;height:110px;cursor:pointer}
+.bar{flex:1;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent-2) 60%,transparent));transition:height .7s cubic-bezier(.2,.8,.2,1);position:relative;min-height:6px}
+.bar:hover{filter:brightness(1.15)}
+.bar span{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);font-family:var(--f-mono);font-size:10px;color:var(--muted);opacity:0;transition:opacity .2s;white-space:nowrap}
+.bar:hover span{opacity:1}
+.chart-meta{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:8px}
+
+/* toggle */
+.tg{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:var(--r-sm);background:var(--glass-strong);border:1px solid var(--line)}
+.tg + .tg{margin-top:8px}
+.tg span{font-size:14px;font-weight:600}
+.sw{position:relative;width:48px;height:28px;border-radius:999px;border:0;background:var(--line-strong);flex:none;transition:background .3s;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.sw[aria-checked="true"]{background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+.sw[aria-checked="true"]::after{transform:translateX(20px)}
+.tg-note{font-size:12.5px;color:var(--muted);margin-top:10px;min-height:2.6em}
+
+/* theme swatches */
+.sw-row{display:flex;gap:10px}
+/* Без нативного вигляду кнопки й без напівпрозорої рамки: саме вони давали білі смужки й «гострі» кути */
+.swatch{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:84px;padding:0;margin:0;border:0;border-radius:18px;
+  position:relative;overflow:hidden;background-clip:padding-box;transform:translateZ(0);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);transition:flex .5s cubic-bezier(.2,.8,.2,1),box-shadow .3s}
+.swatch:hover,.swatch[aria-pressed="true"]{flex:2.4}
+.swatch[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.swatch em{position:absolute;left:10px;bottom:8px;font-style:normal;font-size:11px;font-weight:700;opacity:0;transition:opacity .3s;white-space:nowrap}
+.swatch:hover em,.swatch[aria-pressed="true"] em{opacity:1}
+/* Плавна зміна теми всього сайту */
+html.theming body,html.theming body *{transition:background-color .6s ease,color .6s ease,border-color .6s ease,box-shadow .6s ease!important}
+
+/* ── Калькулятор ─────────────────────────────────────────────── */
+.calc{display:grid;gap:16px}
+@media (min-width:900px){.calc{grid-template-columns:1.1fr .9fr}}
+.calc .glass{padding:clamp(22px,3vw,36px)}
+.field{display:grid;gap:10px}
+.field + .field{margin-top:26px}
+.field label{display:flex;justify-content:space-between;gap:12px;font-weight:600}
+.field output{font-family:var(--f-mono);color:var(--accent);font-weight:500}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:999px;background:linear-gradient(90deg,var(--accent) var(--p,50%),var(--line-strong) var(--p,50%));outline-offset:6px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:4px solid var(--accent);box-shadow:0 4px 14px -2px var(--glow-a);cursor:grab}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid var(--accent);cursor:grab}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:999px;background:var(--glass-strong);border:1px solid var(--line);position:relative}
+.seg button{position:relative;z-index:1;border:0;background:none;padding:10px 6px;border-radius:999px;font-weight:700;font-size:14px;color:var(--muted);transition:color .3s}
+.seg button[aria-pressed="true"]{color:var(--on-accent)}
+.seg .pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 16px)/3);border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));transition:transform .45s cubic-bezier(.3,1.3,.5,1)}
+.result{display:flex;flex-direction:column;gap:18px}
+.big{font-family:var(--f-display);font-weight:800;font-size:clamp(56px,8vw,96px);letter-spacing:-.05em;line-height:.95;font-variant-numeric:tabular-nums}
+.big small{font-size:.32em;letter-spacing:-.02em;margin-left:8px;color:var(--muted);font-weight:600}
+.kv{display:grid;gap:10px;padding-top:18px;border-top:1px solid var(--line)}
+.kv div{display:flex;justify-content:space-between;gap:12px;font-size:15px}
+.kv dt,.kv dd{margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.fine{font-size:12.5px;color:var(--muted)}
+
+/* ── Відгук ──────────────────────────────────────────────────── */
+.quote{padding:clamp(28px,5vw,64px);display:grid;gap:26px}
+.quote blockquote{margin:0;font-family:var(--f-display);font-weight:600;font-size:clamp(22px,3.4vw,40px);letter-spacing:-.035em;line-height:1.18;text-wrap:balance}
+.quote blockquote::before{content:"“";display:block;font-size:2.4em;line-height:.6;color:var(--accent);margin-bottom:.15em}
+.who{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:15px}
+.who .ava{width:46px;height:46px}
+
+/* ── CTA band ────────────────────────────────────────────────── */
+.cta-band{padding:clamp(34px,6vw,72px);text-align:center;display:grid;justify-items:center;gap:22px;
+  background:radial-gradient(ellipse at 50% 0%,var(--glow-a),transparent 70%),var(--glass)}
+.cta-band .h2{max-width:16ch}
+
+/* ── Підсторінки ─────────────────────────────────────────────── */
+.sub-hero{padding-top:calc(150px + env(safe-area-inset-top,0px));padding-bottom:clamp(32px,5vw,64px)}
+.sub-hero h1{font-size:clamp(38px,7vw,84px);font-weight:800;margin-top:18px;letter-spacing:-.05em}
+.reasons{display:grid;gap:16px}
+@media (min-width:860px){.reasons{grid-template-columns:repeat(2,1fr)}}
+.reason{padding:clamp(24px,3vw,34px);display:grid;gap:16px;align-content:start}
+.reason .tag{font-family:var(--f-mono);font-size:12px;color:var(--hint);letter-spacing:.1em;text-transform:uppercase}
+.reason h3{font-size:clamp(22px,2.6vw,30px);font-weight:600}
+.reason ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.reason li{display:grid;grid-template-columns:22px 1fr;gap:10px;color:var(--muted);font-size:15px}
+.reason li svg{width:20px;height:20px;color:var(--accent);margin-top:2px}
+.guar{display:grid;gap:16px}
+@media (min-width:760px){.guar{grid-template-columns:repeat(3,1fr)}}
+.guar .glass{padding:26px;display:grid;gap:10px;align-content:start}
+.guar strong{font-family:var(--f-display);font-size:clamp(26px,3vw,36px);font-weight:800;letter-spacing:-.04em}
+
+.steps{display:grid;gap:16px;counter-reset:s}
+@media (min-width:860px){.steps{grid-template-columns:repeat(3,1fr)}}
+.step{padding:26px;display:grid;gap:12px;align-content:start}
+.step::before{counter-increment:s;content:"/0" counter(s);font-family:var(--f-mono);color:var(--accent);font-size:14px}
+.step h3{font-size:20px;font-weight:600}
+.step p{color:var(--muted);font-size:15px}
+
+.stack{display:grid;gap:16px}
+@media (min-width:860px){.stack{grid-template-columns:repeat(3,1fr)}}
+.tech{padding:26px;display:grid;gap:12px;align-content:start}
+.tech h3{font-size:19px;font-weight:600}
+.tech p{color:var(--muted);font-size:15px}
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:14px 26px;padding:22px 26px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:okp 2s ease-out infinite;flex:none}
+@keyframes okp{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+.status .it{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.flow{display:grid;gap:10px;font-family:var(--f-mono);font-size:13px}
+.flow div{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--line);color:var(--muted)}
+.flow b{color:var(--fg);font-weight:500}
+.flow i{font-style:normal;color:var(--ok);margin-left:auto}
+
+.support-grid{display:grid;gap:16px}
+@media (min-width:860px){.support-grid{grid-template-columns:1fr 1fr}}
+.faq{display:grid;gap:10px}
+.faq details{border-radius:var(--r-md);border:1px solid var(--line);background:var(--glass);transition:border-color .3s,background .3s}
+.faq details[open]{border-color:var(--line-strong);background:var(--glass-strong)}
+.faq summary{list-style:none;cursor:pointer;padding:18px 22px;font-weight:700;display:flex;justify-content:space-between;gap:16px;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-family:var(--f-mono);font-size:20px;color:var(--accent);transition:transform .3s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 22px 20px;color:var(--muted)}
+.form{display:grid;gap:14px;padding:clamp(22px,3vw,32px)}
+.form label{font-weight:600;font-size:14px;display:grid;gap:8px}
+.form input,.form textarea,.form select{font:inherit;color:var(--fg);background:var(--glass-strong);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:12px 14px;width:100%}
+.form textarea{min-height:120px;resize:vertical}
+.form input:focus,.form textarea:focus,.form select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--mark)}
+.out{display:none;gap:10px;padding:16px;border-radius:var(--r-sm);background:var(--mark);font-size:14px}
+.out.show{display:grid}
+.out pre{margin:0;white-space:pre-wrap;font-family:var(--f-mono);font-size:12.5px;color:var(--fg)}
+.contact-line{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-family:var(--f-mono);font-size:14px}
+.contact-line code{padding:6px 10px;border-radius:10px;background:var(--glass-strong);border:1px solid var(--line);user-select:all}
+
+
+/* ── Сторінка «Напишіть нам» ─────────────────────────────────── */
+.contact-grid{display:grid;gap:16px;align-items:start}
+@media (min-width:900px){.contact-grid{grid-template-columns:.9fr 1.1fr}}
+.ig-card{display:grid;gap:14px;padding:clamp(24px,3vw,36px);text-decoration:none;align-content:start}
+.ig-card p{color:var(--muted)}
+.ig-card .btn{justify-self:start}
+.ig-badge{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--accent-3),var(--accent) 50%,var(--accent-2));box-shadow:0 14px 34px -10px var(--glow-a);transition:transform .4s cubic-bezier(.3,1.4,.5,1)}
+.ig-badge svg{width:32px;height:32px}
+.ig-card:hover .ig-badge{transform:rotate(-8deg) scale(1.06)}
+.ig-handle{font-family:var(--f-display);font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.05;overflow-wrap:anywhere}
+.field-group{display:grid;gap:10px}
+.lbl{font-weight:600;font-size:14px}
+.opt{font-weight:500;color:var(--muted);font-size:12.5px;margin-left:6px}
+.seg-2{grid-template-columns:repeat(2,1fr)}
+.seg-2 .pill{width:calc((100% - 12px)/2)}
+.seg button[aria-checked="true"]{color:var(--on-accent)}
+.handle{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--glass-strong);transition:border-color .2s,box-shadow .2s}
+.handle span{padding-left:14px;color:var(--muted);font-family:var(--f-mono)}
+.form .handle input{border:0;background:none;padding-left:4px;box-shadow:none}
+.form .handle input:focus{box-shadow:none}
+.handle:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--mark)}
+.handle.bad{border-color:#e05a6a}
+.err{font-size:13px;color:#e05a6a;min-height:1.2em}
+.inline-link{background:none;border:0;padding:0;color:var(--hint);text-decoration:underline;text-underline-offset:3px;font-size:inherit}
+.hp{position:absolute!important;left:-9999px;width:1px;height:1px;overflow:hidden}
+.out .ok-title{font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:-.02em}
+
+/* Юридичні сторінки */
+.legal{max-width:760px}
+.legal .meta{font-family:var(--f-mono);font-size:13px;color:var(--muted);margin-top:16px}
+.legal h2{font-size:clamp(20px,2.4vw,26px);font-weight:600;letter-spacing:-.03em;margin:44px 0 14px}
+.legal p,.legal li{color:var(--muted);font-size:16px}
+.legal p + p{margin-top:12px}
+.legal ul{padding-left:20px;display:grid;gap:8px;margin:12px 0 0}
+.legal strong{color:var(--fg)}
+.ph{background:var(--mark);color:var(--fg);padding:1px 6px;border-radius:6px;font-family:var(--f-mono);font-size:.88em}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+.toc button{border:1px solid var(--line);background:var(--glass);padding:7px 12px;border-radius:999px;font-size:13px;color:var(--muted)}
+.toc button:hover{color:var(--fg);border-color:var(--line-strong)}
+
+/* ── Футер з гігантською типографікою ────────────────────────── */
+footer{position:relative;z-index:1;margin-top:clamp(40px,8vw,100px);border-top:1px solid var(--line);overflow:hidden}
+.foot-top{display:grid;gap:30px;padding-block:48px 10px}
+@media (min-width:760px){.foot-top{grid-template-columns:1.4fr 1fr 1fr}}
+.foot-top h4{margin:0 0 12px;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--hint);font-weight:500}
+.foot-top nav{display:grid;gap:6px}
+.foot-top nav button{background:none;border:0;padding:3px 0;text-align:left;color:var(--muted);font-size:15px}
+.foot-top nav button:hover,.foot-ig:hover{color:var(--fg)}
+.foot-ig{color:var(--muted);font-size:15px;text-decoration:none;padding:3px 0}
+.foot-top p{color:var(--muted);font-size:15px;max-width:36ch}
+.giant-box{padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));overflow:hidden}
+.giant{
+  display:block;width:max-content;margin:28px auto 0;user-select:none;white-space:nowrap;
+  font-family:var(--f-display);font-weight:800;letter-spacing:-.045em;line-height:1;padding-bottom:.08em;
+  font-size:16vw; /* точний розмір підбирає скрипт, щоб слово стало рівно на ширину */
+  background:
+    radial-gradient(380px circle at var(--gx,50%) var(--gy,40%),var(--accent),transparent 70%),
+    linear-gradient(180deg,color-mix(in srgb,var(--fg) 26%,transparent),color-mix(in srgb,var(--fg) 5%,transparent) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.foot-bot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;padding-block:18px 26px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);position:relative;z-index:1}
+.foot-bot button{background:none;border:0;color:inherit;padding:0;text-decoration:underline;text-underline-offset:3px}
+
+@media (max-width:420px){.btn{padding:13px 18px}.screen{height:520px}.nav .btn-sm{padding:9px 13px;font-size:13px}}
+/* На вузьких екранах у шапці лише логотип і меню — кнопка «Спробувати» є одразу в першому екрані */
+@media (max-width:480px){.nav-cta{display:none}.burger{margin-left:auto}.nav{padding-left:14px}}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .rot .w{animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="atmo" aria-hidden="true"><div class="blob a"></div><div class="blob b"></div><div class="blob c"></div></div>
+
+<!-- ═════════ NAV ═════════ -->
+<header class="nav" role="banner">
+  <a class="logo" href="#" data-go="home" aria-label="BeatyBOTI — на головну"><span class="logo-mark"><svg viewBox="0 0 1024 1024" aria-hidden="true"><rect width="1024" height="1024" rx="232" fill="#D35580"/><path fill="#fff" d="M532 205L602 442L838 512L602 582L532 818L462 582L226 512L462 442Z"/><path fill="#fff" d="M276 205L300 283L378 307L300 331L276 410L252 331L175 307L252 283Z"/></svg></span>BeatyBOTI</a>
+  <nav class="nav-links" aria-label="Основна навігація">
+    <button data-go="home">Головна</button>
+    <button data-go="masters">Чому BeatyBOTI</button>
+    <button data-go="reliability">Надійність</button>
+    <button data-go="support">Підтримка</button>
+  </nav>
+  <a class="btn btn-primary btn-sm nav-cta bot-link" href="#" target="_blank" rel="noopener">Спробувати</a>
+  <button class="burger" id="burger" aria-label="Меню" aria-expanded="false" aria-controls="menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+</header>
+<div class="menu" id="menu">
+  <button data-go="home">Головна</button>
+  <button data-go="masters">Чому BeatyBOTI</button>
+  <button data-go="reliability">Надійність</button>
+  <button data-go="support">Підтримка</button>
+</div>
+
+<main>
+<!-- ═════════════════════ HOME ═════════════════════ -->
+<div class="page" data-page="home">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="badge"><b>Нове</b>Картка запису з ніком клієнта прямо в чаті</span>
+        <h1 id="heroTitle" class="rot" aria-live="off">
+          <span class="ph-line is-on" data-phrase>Ваші вільні <em>3&nbsp;години</em> ввечері</span>
+          <span class="ph-line" data-phrase aria-hidden="true">Ваша робота виглядає <em>як бренд</em></span>
+          <span class="ph-line" data-phrase aria-hidden="true"><em>Автоматизація</em> та офіційність</span>
+          <span class="ph-line" data-phrase aria-hidden="true">Записи, поки ви <em>відпочиваєте</em></span>
+        </h1>
+        <div class="rot-dots" id="rotDots" role="tablist" aria-label="Перемкнути заголовок"></div>
+        <p class="lead">BeatyBOTI приймає записи, нагадує клієнтам про візит і веде ваш розклад у власному Telegram-боті з вашим іменем. Ви працюєте, бот відповідає.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary bot-link" href="#" target="_blank" rel="noopener">Спробувати 14 днів безкоштовно
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <button class="btn btn-ghost" data-go="masters">Чому майстри обирають нас</button>
+        </div>
+        <div class="hero-note">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Без картки під час реєстрації</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Клієнтам нічого не треба встановлювати</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Підтримка в Telegram</span>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="core" aria-hidden="true"></div>
+        <div class="orbit" aria-hidden="true"><i></i></div>
+        <div class="phone" id="phone">
+          <div class="screen" id="screen">
+            <div class="notch" aria-hidden="true"></div>
+            <div class="chat-head">
+              <div class="ava">А</div>
+              <div><strong>Anna Nails Studio</strong><small>бот · ваш особистий</small></div>
+            </div>
+            <div class="chat" id="chat" aria-live="polite"></div>
+            <div class="toast" id="toast">Клієнтку повідомлено ✓</div>
+          </div>
+        </div>
+        <div class="themes" role="group" aria-label="Тема оформлення в демо">
+          Тема
+          <button data-site-theme="dusty" aria-label="Dusty Rose" style="background:#d4537e"></button>
+          <button data-site-theme="dark" aria-label="Dark Rose" style="background:#e8748a" aria-pressed="true"></button>
+          <button data-site-theme="blush" aria-label="Blush Glass" style="background:#c84070"></button>
+          <button data-site-theme="mauve" aria-label="Deep Mauve" style="background:#c860a8"></button>
+          <button data-site-theme="noir" aria-label="Rosé Noir" style="background:#d4806a"></button>
+        </div>
+        <p class="demo-hint">Натисніть «Підтвердити» в телефоні: так виглядає новий запис у майстра</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee" aria-label="Для кого BeatyBOTI">
+    <div class="track" id="track"></div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Можливості</span>
+        <h2 class="h2">Усе для запису.<br><span class="grad">Нічого зайвого.</span></h2>
+        <p class="lead">Ваші клієнти записуються в Telegram, яким уже користуються щодня. Ви бачите розклад, доходи й нагадування в одному місці.</p>
+      </div>
+
+      <div class="bento">
+        <article class="glass spot card b-1 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 17.9l.9-5.4L4.2 8.7l5.4-.8z"/></svg></div>
+          <h3>Власний бот з вашим іменем</h3>
+          <p>Не спільна платформа, де ви одна з тисяч. Клієнти пишуть саме вашому боту: з вашою назвою, послугами й цінами.</p>
+          <div class="viz">
+            <div class="botname"><span class="at">t.me/</span><span id="typed"></span><span class="caret" aria-hidden="true"></span></div>
+            <div class="chips"><span class="chip">Ваші послуги й ціни</span><span class="chip">Ваш графік</span><span class="chip">Ваші правила скасування</span><span class="chip">Ваша тема</span></div>
+          </div>
+        </article>
+
+        <article class="glass spot card b-2 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a1.9 1.9 0 003.4 0"/></svg></div>
+          <h3>Два нагадування клієнту</h3>
+          <p>Ви обираєте коли: за 24, 48 чи 72 години, і ще раз за 1–3 години до візиту.</p>
+          <div class="viz tl" aria-hidden="true">
+            <span class="pt ring" style="left:8%">🔔</span><span class="lab" style="left:8%">−24 год</span>
+            <span class="pt ring" style="left:52%">🔔</span><span class="lab" style="left:52%">−2 год</span>
+            <span class="go">Візит</span>
+          </div>
+        </article>
+
+        <article class="glass spot card b-3 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+          <h3>Запис 24/7</h3>
+          <p>Клієнтка обирає вільне віконце сама, навіть о другій ночі.</p>
+          <div class="viz slots" id="slots" aria-hidden="true"></div>
+        </article>
+
+        <article class="glass spot card b-4 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+          <h3>Доходи й витрати</h3>
+          <p>Скільки заробили за місяць і що пішло на матеріали.</p>
+          <div class="viz">
+            <div class="chart" id="chart" role="button" tabindex="0" aria-label="Приклад графіка доходу, натисніть щоб оновити"></div>
+            <div class="chart-meta"><span>пн</span><span>нд</span></div>
+          </div>
+        </article>
+
+        <article class="glass spot card b-5 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Без подвійних записів</h3>
+          <p>Два клієнти не займуть один час, навіть якщо натиснуть одночасно.</p>
+          <div class="viz">
+            <div class="tg"><span>Автопідтвердження</span><button class="sw" role="switch" aria-checked="false" id="swAuto" aria-label="Автопідтвердження"></button></div>
+            <p class="tg-note" id="swNote">Вимкнено: ви підтверджуєте кожен запис кнопкою в чаті.</p>
+          </div>
+        </article>
+
+        <article class="glass spot card b-6 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Час за Києвом. Завжди.</h3>
+          <p>Навіть якщо телефон клієнтки стоїть на іншому часовому поясі, запис на 10:00 означає 10:00 у вашому салоні.</p>
+          <div class="viz flow" aria-hidden="true">
+            <div><b>Телефон клієнтки</b> CET 09:00 <i>→</i></div>
+            <div><b>Ваш розклад</b> Київ 10:00 <i>✓</i></div>
+          </div>
+        </article>
+
+        <article class="glass spot card b-7 reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 000 20c1 0 1.6-.8 1.6-1.7 0-.5-.2-.8-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a6 6 0 006-6c0-4.4-4.5-8.2-10-8.2z"/></svg></div>
+          <h3>П'ять тем під ваш стиль</h3>
+          <p>Від ніжного денного до глибокого вечірнього. Наведіть або натисніть, і весь сайт перефарбується.</p>
+          <div class="viz sw-row" role="group" aria-label="Тема сайту">
+            <button class="swatch" data-site-theme="dusty" aria-pressed="false" style="background:linear-gradient(135deg,#fff8f9,#d4537e);color:#4b1528"><em>Dusty Rose</em></button>
+            <button class="swatch" data-site-theme="dark" aria-pressed="false" style="background:linear-gradient(135deg,#1a0a0e,#e8748a);color:#fdf0f2"><em>Dark Rose</em></button>
+            <button class="swatch" data-site-theme="blush" aria-pressed="false" style="background:linear-gradient(135deg,#fff0f4,#c84070);color:#3d0f20"><em>Blush Glass</em></button>
+            <button class="swatch" data-site-theme="mauve" aria-pressed="false" style="background:linear-gradient(135deg,#150810,#c860a8);color:#f5e0ee"><em>Deep Mauve</em></button>
+            <button class="swatch" data-site-theme="noir" aria-pressed="false" style="background:linear-gradient(135deg,#0e0a0c,#d4806a);color:#faeae0"><em>Rosé Noir</em></button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Порахуйте самі</span>
+        <h2 class="h2">Скільки часу <span class="grad">ви повертаєте</span></h2>
+        <p class="lead">Кожен запис через дірект це кілька повідомлень: вільний час, послуга, ціна, адреса, нагадування. Бот бере це на себе.</p>
+      </div>
+      <div class="calc">
+        <div class="glass spot reveal">
+          <div class="field">
+            <label for="cRec">Записів на тиждень <output id="oRec">25</output></label>
+            <input type="range" id="cRec" min="5" max="80" step="1" value="25">
+          </div>
+          <div class="field">
+            <label for="cMin">Хвилин переписки на один запис <output id="oMin">7</output></label>
+            <input type="range" id="cMin" min="2" max="15" step="1" value="7">
+          </div>
+          <div class="field">
+            <label id="planLbl">Тариф</label>
+            <div class="seg" role="group" aria-labelledby="planLbl" id="seg">
+              <span class="pill" aria-hidden="true"></span>
+              <button data-plan="1" aria-pressed="false">1 міс</button>
+              <button data-plan="3" aria-pressed="false">3 міс</button>
+              <button data-plan="12" aria-pressed="true">Рік</button>
+            </div>
+          </div>
+        </div>
+        <div class="glass spot result reveal">
+          <span class="eyebrow">Повертаєте щомісяця</span>
+          <div class="big" id="hours">13<small>годин</small></div>
+          <dl class="kv">
+            <div><dt>Тариф на місяць</dt><dd id="price">200 ₴</dd></div>
+            <div><dt>Оплата за період</dt><dd id="total">2400 ₴</dd></div>
+            <div><dt>Ціна однієї вільної години</dt><dd id="perHour">≈ 15 ₴</dd></div>
+          </dl>
+          <p class="fine">Розрахунок приблизний: записи × 4,33 тижня × хвилини переписки. Перші 14 днів безкоштовно.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <figure class="glass spot quote reveal" style="margin:0">
+        <span class="eyebrow">Відгук майстрині</span>
+        <blockquote>Поки що питань чи складності у використанні немає, все дуже зручно.</blockquote>
+        <figcaption class="who"><span class="ava">М</span><span><strong style="color:var(--fg)">Майстриня, Закарпаття</strong><br>починає власну практику</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="glass cta-band reveal">
+        <span class="eyebrow">Старт за 5 хвилин</span>
+        <h2 class="h2">Перший запис через бота <span class="grad">вже сьогодні</span></h2>
+        <p class="lead" style="margin-top:0">Ми допоможемо налаштувати послуги й підготуємо сторіс, щоб клієнти дізналися про запис онлайн.</p>
+        <a class="btn btn-primary bot-link" href="#" target="_blank" rel="noopener">Створити свого бота
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ MASTERS ═════════════════════ -->
+<div class="page" data-page="masters">
+  <section class="sub-hero">
+    <div class="wrap">
+      <span class="eyebrow">Чому BeatyBOTI</span>
+      <h1>Ваш бренд.<br><span class="grad">Ваші клієнти.</span><br>Ваш ріст.</h1>
+      <p class="lead">Бот працює як ваш адміністратор: каже «так» вільному часу, нагадує про візит і не забуває жодного клієнта. Ось чому майстри переходять на онлайн-запис.</p>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap reasons">
+      <article class="glass spot reason reveal">
+        <span class="tag">Брендованість</span>
+        <h3>Ви виглядаєте як студія, навіть працюючи самостійно</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Власний Telegram-бот з вашою назвою та аватаром</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Одне посилання для шапки Instagram, сторіс і візиток</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>П'ять тем оформлення під настрій вашого кабінету</li>
+        </ul>
+      </article>
+      <article class="glass spot reason reveal">
+        <span class="tag">Офіційність</span>
+        <h3>Чіткі правила замість «а можна перенести?»</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Клієнт отримує підтвердження з датою, послугою та ціною</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Ви задаєте, за скільки годин можна скасувати запис</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Ліміт записів на день для одного клієнта</li>
+        </ul>
+      </article>
+      <article class="glass spot reason reveal">
+        <span class="tag">Успішність</span>
+        <h3>Більше записів, менше порожніх віконець</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Запис о будь-якій порі, поки ви спите чи працюєте</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Нагадування, щоб клієнти не забували про візит</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Аналітика доходів і витрат: видно, що приносить гроші</li>
+        </ul>
+      </article>
+      <article class="glass spot reason reveal">
+        <span class="tag">Спокій</span>
+        <h3>Вечір належить вам, а не директу</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Кнопки «Підтвердити» і «Скасувати» прямо в чаті</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Нік клієнта в кожному записі: написати можна в один дотик</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Записи з телефону чи особисто ви вносите самі за кілька секунд</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Наші гарантії</span>
+        <h2 class="h2">Ризикуємо ми, <span class="grad">а не ви</span></h2>
+      </div>
+      <div class="guar">
+        <div class="glass spot reveal"><strong class="grad">14 днів</strong><p class="fine" style="font-size:15px">Повний доступ без оплати. Не сподобається, просто не продовжуєте.</p></div>
+        <div class="glass spot reveal"><strong class="grad">Запуск разом</strong><p class="fine" style="font-size:15px">Допоможемо внести послуги, налаштувати розклад і підготуємо сторіс для клієнтів.</p></div>
+        <div class="glass spot reveal"><strong class="grad">Без прив'язки</strong><p class="fine" style="font-size:15px">Жодних контрактів. Платите за місяць, квартал чи рік, як вам зручно.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow">Як почати</span>
+        <h2 class="h2">Три кроки до <span class="grad">першого запису</span></h2>
+      </div>
+      <div class="steps">
+        <div class="glass spot step reveal"><h3>Створіть бота</h3><p>Відкрийте BeatyBOTI у Telegram і пройдіть коротке знайомство. Ми підкажемо, як отримати власного бота.</p></div>
+        <div class="glass spot step reveal"><h3>Додайте послуги й графік</h3><p>Назва, тривалість, ціна. Робочі години й перерви. Бот сам розрахує вільні віконця.</p></div>
+        <div class="glass spot step reveal"><h3>Поділіться посиланням</h3><p>Шапка Instagram, сторіс, повідомлення постійним клієнтам. Перші записи зазвичай приходять того ж дня.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ RELIABILITY ═════════════════════ -->
+<div class="page" data-page="reliability">
+  <section class="sub-hero">
+    <div class="wrap">
+      <span class="eyebrow">Стабільність і надійність</span>
+      <h1>Запис, якому <span class="grad">можна довіряти</span></h1>
+      <p class="lead">Ваш розклад це ваші гроші. Тому кожен запис, кожна зміна статусу й кожне нагадування проходять перевірки, які ми побудували з першого дня.</p>
+    </div>
+  </section>
+  <section style="padding-top:0">
+    <div class="wrap" style="display:grid;gap:16px">
+      <div class="glass status reveal" role="status">
+        <span class="it"><span class="dot"></span>Запис онлайн</span>
+        <span class="it"><span class="dot" style="animation-delay:.4s"></span>Нагадування</span>
+        <span class="it"><span class="dot" style="animation-delay:.8s"></span>Сповіщення майстру</span>
+        <span class="fine" style="margin-left:auto">Працює на офіційному Telegram Bot API</span>
+      </div>
+      <div class="stack">
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+          <h3>Перевірка кожного входу</h3>
+          <p>Кожен запит із застосунку підписаний Telegram, і ми перевіряємо підпис. Клієнт одного майстра не може побачити чи змінити записи іншого.</p>
+        </article>
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></div>
+          <h3>Захищені канали бота</h3>
+          <p>Бот приймає повідомлення лише від Telegram за секретним ключем. Кнопки «Підтвердити» і «Скасувати» спрацьовують тільки у вас.</p>
+        </article>
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M9 15l2 2 4-4"/></svg></div>
+          <h3>Один час, один клієнт</h3>
+          <p>Слот блокується в момент запису. Якщо двоє натиснуть одночасно, запишеться один, а другий побачить «цей час уже зайнятий».</p>
+        </article>
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v6H4zM4 14h16v6H4z"/><path d="M8 7h.01M8 17h.01"/></svg></div>
+          <h3>Черга сповіщень</h3>
+          <p>Повідомлення йдуть через чергу. Якщо Telegram на мить недоступний, сам запис не губиться, а сповіщення доставляється пізніше.</p>
+        </article>
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 001 1h4"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M9 13h6M9 17h4"/></svg></div>
+          <h3>Історія змін</h3>
+          <p>Кожне підтвердження, скасування чи перенесення записується в журнал: хто, коли й що змінив. Спірні ситуації легко розібрати.</p>
+        </article>
+        <article class="glass spot tech reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Правильний час</h3>
+          <p>Увесь розклад рахується за Києвом з урахуванням літнього й зимового часу, незалежно від налаштувань телефону клієнта.</p>
+        </article>
+      </div>
+      <div class="glass spot reveal" style="padding:clamp(22px,3vw,34px);display:grid;gap:16px">
+        <span class="eyebrow">Шлях одного запису</span>
+        <div class="flow">
+          <div><b>01</b> Клієнтка обирає час у вашому боті <i>✓ підпис Telegram</i></div>
+          <div><b>02</b> Слот блокується, запис зберігається <i>✓ без дублів</i></div>
+          <div><b>03</b> Вам приходить картка з ніком клієнтки <i>✓ черга</i></div>
+          <div><b>04</b> Ви натискаєте «Підтвердити» <i>✓ лише ви</i></div>
+          <div><b>05</b> Клієнтка отримує підтвердження й нагадування <i>✓ за Києвом</i></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ SUPPORT ═════════════════════ -->
+<div class="page" data-page="support">
+  <section class="sub-hero">
+    <div class="wrap">
+      <span class="eyebrow">Активна підтримка</span>
+      <h1>Ми поруч, <span class="grad">а не в тікет-системі</span></h1>
+      <p class="lead">Пишете в Telegram, відповідає людина з команди. Допомагаємо з налаштуванням, сторіс для клієнтів і беремо в роботу ваші ідеї покращень.</p>
+    </div>
+  </section>
+  <section style="padding-top:0">
+    <div class="wrap" style="display:grid;gap:16px">
+      <div class="guar">
+        <div class="glass spot reveal"><strong class="grad">Швидко</strong><p class="fine" style="font-size:15px">Пишете в Telegram і отримуєте відповідь від команди, без ботів-автовідповідачів.</p></div>
+        <div class="glass spot reveal"><strong class="grad">Індивідуально</strong><p class="fine" style="font-size:15px">Потрібна функція під ваш формат роботи? Розкажіть, і ми розглянемо її для наступних оновлень.</p></div>
+        <div class="glass spot reveal"><strong class="grad">З турботою</strong><p class="fine" style="font-size:15px">Допомагаємо з дизайном сторіс і текстами, щоб клієнти легко перейшли на онлайн-запис.</p></div>
+      </div>
+      <div class="support-grid">
+        <div class="faq reveal">
+          <details open><summary>Чи треба клієнтам щось встановлювати?</summary><p>Ні. Запис відкривається прямо в Telegram за посиланням на вашого бота. Якщо клієнт без Telegram, ви вносите запис самі.</p></details>
+          <details><summary>Що буде після 14 днів?</summary><p>Обираєте тариф: 250 ₴ за місяць, 675 ₴ за 3 місяці або 2400 ₴ за рік. Якщо не оплатити, нові онлайн-записи зупиняться, а ваші дані залишаться.</p></details>
+          <details><summary>Клієнти все одно пишуть у дірект. Що робити?</summary><p>Це нормально на старті. Відповідайте посиланням на бота і закріпіть сторіс з ним. Ми підготуємо сторіс у вашому стилі.</p></details>
+          <details><summary>Чи бачить хтось інший мої записи?</summary><p>Ні. Ваші записи й клієнтів бачите тільки ви. Детальніше в політиці конфіденційності.</p></details>
+          <details><summary>Можна вимкнути підтвердження кожного запису?</summary><p>Так. Увімкніть автопідтвердження в налаштуваннях, і записи підтверджуватимуться одразу.</p></details>
+        </div>
+        <form class="glass form reveal" id="reqForm" novalidate>
+          <span class="eyebrow">Запит на покращення</span>
+          <label for="rName">Як до вас звертатися<input id="rName" name="name" autocomplete="name" placeholder="Наприклад, Анна"></label>
+          <label for="rType">Тема
+            <select id="rType" name="type"><option>Ідея покращення</option><option>Питання по налаштуванню</option><option>Щось не працює</option><option>Допомога зі сторіс</option></select>
+          </label>
+          <label for="rText">Повідомлення<textarea id="rText" name="text" placeholder="Опишіть, що хочете змінити або що сталося" required></textarea></label>
+          <button class="btn btn-primary" type="submit">Підготувати повідомлення</button>
+          <div class="out" id="reqOut" aria-live="polite">
+            <span>Скопіюйте текст і надішліть його нам у Telegram: <code class="sup-name"></code></span>
+            <pre id="reqText"></pre>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <button class="btn btn-ghost btn-sm" type="button" id="copyReq">Скопіювати</button>
+              <a class="btn btn-ghost btn-sm sup-link" href="#" target="_blank" rel="noopener">Відкрити чат підтримки</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ START / CONTACT ═════════════════════ -->
+<div class="page" data-page="start">
+  <section class="sub-hero">
+    <div class="wrap">
+      <span class="eyebrow">Почати з BeatyBOTI</span>
+      <h1>Напишіть <span class="grad">нам</span></h1>
+      <p class="lead">Скористайтеся посиланням на Instagram або залиште анкету тут, і ми обовʼязково вам напишемо.</p>
+    </div>
+  </section>
+  <section style="padding-top:0">
+    <div class="wrap contact-grid">
+      <a class="glass spot ig-card reveal ig-link" href="#" target="_blank" rel="noopener">
+        <span class="ig-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/></svg></span>
+        <span class="eyebrow">Instagram</span>
+        <strong class="ig-handle">@beaty.boti</strong>
+        <p>Пишіть у дірект: відповідаємо самі, без автовідповідачів. Там же приклади сторіс і новини оновлень.</p>
+        <span class="btn btn-primary">Відкрити Instagram
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></span>
+      </a>
+
+      <form class="glass form reveal" id="leadForm" novalidate>
+        <span class="eyebrow">Анкета</span>
+        <label for="lName">Як до вас звертатися<input id="lName" name="name" autocomplete="given-name" placeholder="Наприклад, Анна" required></label>
+
+        <div class="field-group">
+          <span class="lbl" id="lContactLbl">Де вам написати</span>
+          <div class="seg seg-2" role="radiogroup" aria-labelledby="lContactLbl" id="lSeg">
+            <span class="pill" aria-hidden="true"></span>
+            <button type="button" role="radio" data-ch="instagram" aria-checked="true">Instagram</button>
+            <button type="button" role="radio" data-ch="telegram" aria-checked="false">Telegram</button>
+          </div>
+          <div class="handle">
+            <span aria-hidden="true">@</span>
+            <input id="lHandle" name="handle" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ваш_нік в Instagram" aria-label="Нік в Instagram" aria-describedby="lHandleErr" required>
+          </div>
+          <span class="err" id="lHandleErr" aria-live="polite"></span>
+        </div>
+
+        <label for="lCraft">Ваша сфера
+          <select id="lCraft" name="craft"><option>Манікюр і педикюр</option><option>Брови та вії</option><option>Перукар / барбер</option><option>Косметологія</option><option>Масаж</option><option>Інше</option></select>
+        </label>
+        <label for="lText">Коментар <span class="opt">необовʼязково</span><textarea id="lText" name="text" placeholder="Наприклад: хочу спробувати, працюю сама в Ужгороді"></textarea></label>
+        <label class="hp" aria-hidden="true">Сайт<input id="lWebsite" name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="btn btn-primary" type="submit" id="lSubmit">Надіслати анкету</button>
+        <p class="fine">Надсилаючи анкету, ви погоджуєтеся з <button type="button" class="inline-link" data-go="privacy">політикою конфіденційності</button>.</p>
+
+        <div class="out" id="leadOut" aria-live="polite"></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ PRIVACY ═════════════════════ -->
+<div class="page" data-page="privacy">
+  <section class="sub-hero">
+    <div class="wrap legal">
+      <span class="eyebrow">Документи</span>
+      <h1 style="font-size:clamp(34px,6vw,64px)">Політика конфіденційності</h1>
+      <p class="meta">Редакція від 15 листопада 2026 року</p>
+      <div class="toc" id="tocP"></div>
+
+      <h2 id="p1">1. Хто ми</h2>
+      <p>Сервіс BeatyBOTI (далі «Сервіс», «ми») надає майстрам бʼюті-сфери інструменти онлайн-запису в Telegram. Оператор Сервісу: <span class="ph">[повна назва ФОП / ТОВ]</span>, <span class="ph">[код ЄДРПОУ / РНОКПП]</span>, адреса: <span class="ph">[юридична адреса]</span>. Контакт з питань даних: <span class="ph">[email]</span>.</p>
+
+      <h2 id="p2">2. Чиї дані ми обробляємо</h2>
+      <p><strong>Майстри</strong> — користувачі, які створили свій бот у Сервісі. Щодо їхніх даних ми є володільцем.</p>
+      <p><strong>Клієнти майстрів</strong> — люди, які записуються до майстра через його бот. Для цих даних володільцем є майстер, а ми обробляємо їх за його дорученням, лише щоб записи працювали.</p>
+
+      <h2 id="p3">3. Які дані ми збираємо</h2>
+      <ul>
+        <li><strong>Від Telegram:</strong> ідентифікатор користувача, імʼя, нікнейм (якщо він заданий).</li>
+        <li><strong>Дані майстра:</strong> назва, телефон (якщо вказаний), токен бота, послуги, ціни, розклад, налаштування, дані про підписку, записи доходів і витрат.</li>
+        <li><strong>Дані клієнта:</strong> імʼя, телефон (якщо вказаний), історія записів, коментарі до запису, нотатки майстра.</li>
+        <li><strong>Технічні дані:</strong> журнал змін записів (хто і коли змінив статус), події реєстрації (наприклад, з якого рекламного посилання людина відкрила бота).</li>
+      </ul>
+      <p>Ми не збираємо паролі, номери банківських карток чи паспортні дані. Оплата, якщо вона проходить через Telegram, обробляється платіжним провайдером.</p>
+
+      <h2 id="p4">4. Для чого ми їх використовуємо</h2>
+      <ul>
+        <li>щоб створювати, підтверджувати, переносити й скасовувати записи;</li>
+        <li>щоб надсилати сповіщення майстру й нагадування клієнтам;</li>
+        <li>щоб показувати майстру розклад, клієнтів і аналітику;</li>
+        <li>щоб обслуговувати підписку і відповідати у підтримці;</li>
+        <li>щоб розуміти, які канали реклами приводять нових майстрів, і покращувати Сервіс.</li>
+      </ul>
+      <p>Ми не продаємо персональні дані і не передаємо їх рекламодавцям.</p>
+
+      <h2 id="p5">5. Підстави обробки</h2>
+      <p>Ми обробляємо дані відповідно до Закону України «Про захист персональних даних» на підставі згоди користувача та для виконання договору (Умов використання). Для користувачів з ЄС застосовуються відповідні положення GDPR.</p>
+
+      <h2 id="p6">6. Кому передаються дані</h2>
+      <ul>
+        <li><strong>Telegram</strong> — для доставки повідомлень і роботи міні-застосунку;</li>
+        <li><strong>хостинг-провайдер</strong> <span class="ph">[назва, напр. Railway]</span>, сервери якого розташовані <span class="ph">[країна/регіон]</span> — для зберігання бази даних і роботи Сервісу;</li>
+        <li><strong>платіжні провайдери</strong> — лише якщо ви оплачуєте через них;</li>
+        <li><strong>державні органи</strong> — тільки у випадках, прямо передбачених законом.</li>
+      </ul>
+      <p>Якщо сервери розташовані за межами України, дані передаються туди з дотриманням вимог законодавства про транскордонну передачу.</p>
+
+      <h2 id="p7">7. Як ми захищаємо дані</h2>
+      <p>Доступ до даних мають лише уповноважені члени команди. Запити до Сервісу перевіряються за криптографічним підписом Telegram, канали бота захищені секретним ключем, а дані кожного майстра відокремлені від даних інших майстрів.</p>
+
+      <h2 id="p8">8. Скільки ми зберігаємо дані</h2>
+      <p>Поки діє акаунт майстра. Після видалення акаунта дані видаляються або знеособлюються протягом <span class="ph">[30]</span> днів, крім випадків, коли закон вимагає зберігати їх довше.</p>
+
+      <h2 id="p9">9. Ваші права</h2>
+      <p>Ви можете дізнатися, які ваші дані ми зберігаємо, виправити їх, обмежити обробку, відкликати згоду або вимагати видалення. Клієнти майстра можуть звернутися до самого майстра або до нас. Також ви маєте право поскаржитися Уповноваженому Верховної Ради України з прав людини.</p>
+
+      <h2 id="p10">10. Зміни політики</h2>
+      <p>Про суттєві зміни ми повідомимо через бота щонайменше за 7 днів. Актуальна редакція завжди доступна на цій сторінці.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ═════════════════════ TERMS ═════════════════════ -->
+<div class="page" data-page="terms">
+  <section class="sub-hero">
+    <div class="wrap legal">
+      <span class="eyebrow">Документи</span>
+      <h1 style="font-size:clamp(34px,6vw,64px)">Умови використання</h1>
+      <p class="meta">Редакція від 15 листопада 2026 року</p>
+      <div class="toc" id="tocT"></div>
+
+      <h2 id="t1">1. Загальні положення</h2>
+      <p>Ці Умови регулюють користування сервісом BeatyBOTI, який надає <span class="ph">[повна назва ФОП / ТОВ]</span> (далі «ми»). Реєструючись у Сервісі, ви погоджуєтеся з цими Умовами та Політикою конфіденційності.</p>
+
+      <h2 id="t2">2. Що надає Сервіс</h2>
+      <p>Сервіс дає майстру власного Telegram-бота для онлайн-запису, міні-застосунок для керування розкладом, послугами, клієнтами й аналітикою, а також автоматичні сповіщення та нагадування.</p>
+
+      <h2 id="t3">3. Реєстрація і акаунт</h2>
+      <ul>
+        <li>Користуватися Сервісом як майстер можна з 18 років.</li>
+        <li>Ви відповідаєте за доступ до свого Telegram-акаунта і токена бота.</li>
+        <li>Дані, які ви вносите (послуги, ціни, графік), мають бути правдивими.</li>
+      </ul>
+
+      <h2 id="t4">4. Пробний період і оплата</h2>
+      <ul>
+        <li>Після реєстрації діє безкоштовний пробний період 14 днів.</li>
+        <li>Далі діють тарифи: 250 ₴ за 1 місяць, 675 ₴ за 3 місяці, 2400 ₴ за 12 місяців. Ціни можуть змінюватися; оплачений період за новою ціною не перераховується.</li>
+        <li>Без оплати прийом нових онлайн-записів призупиняється, дані акаунта зберігаються.</li>
+        <li>Повернення коштів: <span class="ph">[умови повернення]</span>.</li>
+      </ul>
+
+      <h2 id="t5">5. Обовʼязки майстра</h2>
+      <ul>
+        <li>Використовувати Сервіс лише для законної діяльності.</li>
+        <li>Повідомляти своїх клієнтів, що їхні дані для запису обробляються через Сервіс.</li>
+        <li>Не надсилати через бота спам чи матеріали, що порушують права інших людей.</li>
+      </ul>
+
+      <h2 id="t6">6. Доступність Сервісу</h2>
+      <p>Ми робимо все, щоб Сервіс працював стабільно, і заздалегідь попереджаємо про планові роботи. Водночас робота Сервісу залежить від Telegram і хостинг-провайдера, тому ми не можемо гарантувати безперервну доступність у 100% часу.</p>
+
+      <h2 id="t7">7. Відповідальність</h2>
+      <p>Ми не відповідаємо за якість послуг майстра, неявки клієнтів чи домовленості між майстром і клієнтом. Наша сукупна відповідальність обмежується сумою, сплаченою вами за останні 3 місяці користування.</p>
+
+      <h2 id="t8">8. Інтелектуальна власність</h2>
+      <p>Програмний код, дизайн, назва та логотип BeatyBOTI належать нам. Ваші дані (послуги, клієнти, фото) належать вам.</p>
+
+      <h2 id="t9">9. Припинення користування</h2>
+      <p>Ви можете припинити користування будь-коли, написавши в підтримку. Ми можемо заблокувати акаунт у разі грубого порушення цих Умов, попередньо повідомивши вас.</p>
+
+      <h2 id="t10">10. Право і контакти</h2>
+      <p>До цих Умов застосовується право України. Спори вирішуються шляхом переговорів, а якщо не вдається, у суді за місцезнаходженням оператора. Контакти: <span class="ph">[email]</span>, Telegram підтримки: <span class="sup-name ph"></span>.</p>
+    </div>
+  </section>
+</div>
+</main>
+
+<!-- ═════════ FOOTER ═════════ -->
+<footer>
+  <div class="wrap foot-top">
+    <div>
+      <a class="logo" href="#" data-go="home"><span class="logo-mark"><svg viewBox="0 0 1024 1024" aria-hidden="true"><rect width="1024" height="1024" rx="232" fill="#D35580"/><path fill="#fff" d="M532 205L602 442L838 512L602 582L532 818L462 582L226 512L462 442Z"/><path fill="#fff" d="M276 205L300 283L378 307L300 331L276 410L252 331L175 307L252 283Z"/></svg></span>BeatyBOTI</a>
+      <p style="margin-top:14px">Онлайн-запис для бʼюті-майстрів у власному Telegram-боті. Зроблено в Ужгороді з турботою про ваш вільний час.</p>
+    </div>
+    <div>
+      <h4>Сервіс</h4>
+      <nav aria-label="Сервіс"><button data-go="home">Головна</button><button data-go="masters">Чому BeatyBOTI</button><button data-go="reliability">Надійність</button><button data-go="support">Підтримка</button><button data-go="start">Напишіть нам</button><a class="ig-link foot-ig" href="#" target="_blank" rel="noopener">Instagram @beaty.boti</a></nav>
+    </div>
+    <div>
+      <h4>Документи</h4>
+      <nav aria-label="Документи"><button data-go="privacy">Політика конфіденційності</button><button data-go="terms">Умови використання</button></nav>
+    </div>
+  </div>
+  <div class="giant-box"><span class="giant" id="giant" aria-hidden="true">BeatyBOTI</span></div>
+  <div class="foot-bot wrap">
+    <span>© 2026 BeatyBOTI. Усі права захищені.</span>
+    <span><button data-go="privacy">Конфіденційність</button> · <button data-go="terms">Умови</button></span>
+  </div>
+</footer>
+
+<script>
+/* ── Налаштування посилань ─────────────────────────────────────────────── */
+// Instagram команди (без трекінг-параметрів із QR-коду).
+const INSTAGRAM_URL = 'https://www.instagram.com/beaty.boti/';
+// Куди надсилати анкету (API бота на Railway). Якщо сервер недоступний,
+// анкета покаже готовий текст, який можна скопіювати й надіслати в Instagram.
+const LEADS_ENDPOINT = 'https://botbeaty-production.up.railway.app/api/v1/leads';
+// Username акаунта підтримки в Telegram (без @), для сторінки «Підтримка».
+const BOT_USERNAME = '';
+const SUPPORT_USERNAME = '';
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Усі кнопки «Спробувати» ведуть на сторінку «Напишіть нам».
+document.querySelectorAll('.bot-link').forEach(a => { a.removeAttribute('target'); a.removeAttribute('rel'); a.href = '#start'; a.dataset.go = 'start'; });
+document.querySelectorAll('.ig-link').forEach(a => a.href = INSTAGRAM_URL);
+document.querySelectorAll('.sup-link').forEach(a => { if (SUPPORT_USERNAME) a.href = `https://t.me/${SUPPORT_USERNAME}`; else a.hidden = true; });
+document.querySelectorAll('.sup-name').forEach(el => el.textContent = SUPPORT_USERNAME ? '@' + SUPPORT_USERNAME : '[Telegram підтримки]');
+
+/* ── Роутинг по hash ───────────────────────────────────────────────────── */
+const PAGES = ['home','masters','reliability','support','start','privacy','terms'];
+const menu = document.getElementById('menu'), burger = document.getElementById('burger');
+function show(name, push){
+  if(!PAGES.includes(name)) name = 'home';
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === name));
+  document.querySelectorAll('[data-go]').forEach(b => {
+    if (b.closest('.nav-links') || b.closest('.menu')) b.toggleAttribute('aria-current', b.dataset.go === name), b.dataset.go === name && b.setAttribute('aria-current','page');
+  });
+  menu.classList.remove('open'); burger.setAttribute('aria-expanded','false');
+  if (push) { if (name === 'home') history.pushState(null,'',location.pathname + location.search); else location.hash = name; }
+  window.scrollTo({top:0, behavior: push && !reduce ? 'smooth' : 'auto'});
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-go]'); if(!b) return;
+  e.preventDefault(); show(b.dataset.go, true);
+});
+addEventListener('hashchange', () => show(location.hash.slice(1) || 'home'));
+show(location.hash.slice(1) || 'home');
+burger.addEventListener('click', () => { const o = menu.classList.toggle('open'); burger.setAttribute('aria-expanded', String(o)); });
+
+/* ── Заголовок, що змінюється ──────────────────────────────────────────── */
+const ROT_MS = 3600;
+const phrases = [...document.querySelectorAll('[data-phrase]')];
+// Кожне слово — окремий span, щоб воно зʼявлялося з невеликою затримкою.
+phrases.forEach(ph => {
+  const wrapWords = node => [...node.childNodes].forEach(n => {
+    if (n.nodeType === 3) {
+      const frag = document.createDocumentFragment();
+      n.textContent.split(/(\s+)/).forEach(part => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) frag.append(' ');
+        else { const w = document.createElement('span'); w.className = 'w'; w.textContent = part; frag.append(w); }
+      });
+      n.replaceWith(frag);
+    } else if (n.nodeType === 1 && !n.classList.contains('w')) {
+      const w = document.createElement('span'); w.className = 'w'; n.replaceWith(w); w.append(n);
+    }
+  });
+  wrapWords(ph);
+  ph.querySelectorAll('.w').forEach((w,i) => w.style.animationDelay = (i*0.09) + 's');
+});
+const rotDots = document.getElementById('rotDots');
+rotDots.style.setProperty('--rot-ms', ROT_MS + 'ms');
+phrases.forEach((ph,i) => {
+  const d = document.createElement('button'); d.type = 'button'; d.setAttribute('role','tab');
+  d.setAttribute('aria-label', ph.textContent.trim()); d.setAttribute('aria-selected', String(i === 0));
+  d.addEventListener('click', () => { goPhrase(i); restartRot(); });
+  rotDots.append(d);
+});
+let pi = 0, rotTimer = null;
+function goPhrase(n){
+  if (n === pi) return;
+  const prev = phrases[pi], next = phrases[n];
+  prev.classList.remove('is-on'); prev.classList.add('is-out'); prev.setAttribute('aria-hidden','true');
+  setTimeout(() => prev.classList.remove('is-out'), 520);
+  next.classList.add('is-on'); next.removeAttribute('aria-hidden');
+  [...rotDots.children].forEach((d,i) => {
+    d.setAttribute('aria-selected', String(i === n));
+    if (i === n) { d.style.animation = 'none'; void d.offsetWidth; d.style.animation = ''; }
+  });
+  pi = n;
+}
+function restartRot(){ clearInterval(rotTimer); if (!reduce) rotTimer = setInterval(() => goPhrase((pi + 1) % phrases.length), ROT_MS); }
+restartRot();
+
+/* ── Спотлайт за курсором ─────────────────────────────────────────────── */
+document.addEventListener('pointermove', e => {
+  const c = e.target.closest && e.target.closest('.spot'); if(!c) return;
+  const r = c.getBoundingClientRect();
+  c.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+  c.style.setProperty('--my', (e.clientY - r.top) + 'px');
+});
+
+/* ── Телефон: 3D-нахил ────────────────────────────────────────────────── */
+const phone = document.getElementById('phone');
+if (!reduce && matchMedia('(hover:hover)').matches) {
+  const stage = phone.parentElement;
+  stage.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect();
+    const x = (e.clientX - r.left)/r.width - .5, y = (e.clientY - r.top)/r.height - .5;
+    phone.style.transform = `rotateY(${x*14}deg) rotateX(${-y*10}deg)`;
+  });
+  stage.addEventListener('pointerleave', () => phone.style.transform = '');
+}
+
+/* ── Телефон: живий чат з карткою запису ──────────────────────────────── */
+const THEMES = {
+  dusty:{bg:'#fff8f9',bg2:'#fbeaf0',fg:'#4b1528',hint:'#993556',btn:'#d4537e'},
+  dark:{bg:'#1a0a0e',bg2:'#2d1018',fg:'#fdf0f2',hint:'#f9c6d0',btn:'#e8748a'},
+  blush:{bg:'#fff0f4',bg2:'#ffffff',fg:'#3d0f20',hint:'#a03058',btn:'#c84070'},
+  mauve:{bg:'#150810',bg2:'#200d1a',fg:'#f5e0ee',hint:'#e8a0c8',btn:'#c860a8'},
+  noir:{bg:'#0e0a0c',bg2:'#1a1014',fg:'#faeae0',hint:'#e8b090',btn:'#d4806a'},
+};
+/* Тема всього сайту: 5 тем застосунку. Наведення — попередній перегляд, клік/тап — вибір. */
+const dark = (bg,bg2,surface,fg,muted,hint,a1,a2,a3,ga,gb,gc,mark) => ({
+  '--bg':bg,'--bg-2':bg2,'--surface':surface,'--fg':fg,'--muted':muted,'--hint':hint,
+  '--accent':a1,'--accent-2':a2,'--accent-3':a3,'--glow-a':ga,'--glow-b':gb,'--glow-c':gc,'--mark':mark,
+  '--glass':'rgba(255,255,255,.035)','--glass-strong':'rgba(255,255,255,.06)',
+  '--line':'rgba(255,255,255,.09)','--line-strong':'rgba(255,255,255,.18)',
+  '--grid':`color-mix(in srgb, ${fg} 5%, transparent)`,'--shadow':'0 30px 80px -30px rgba(0,0,0,.7)',
+  '--grad-text':`linear-gradient(100deg,${fg} 0%,${hint} 38%,${a1} 70%,${a2} 100%)`,'--ok':'#7fd4a8','color-scheme':'dark'});
+const light = (bg,bg2,surface,fg,muted,hint,a1,a2,a3,ga,gb,gc,mark) => ({
+  '--bg':bg,'--bg-2':bg2,'--surface':surface,'--fg':fg,'--muted':muted,'--hint':hint,
+  '--accent':a1,'--accent-2':a2,'--accent-3':a3,'--glow-a':ga,'--glow-b':gb,'--glow-c':gc,'--mark':mark,
+  '--glass':'rgba(255,255,255,.58)','--glass-strong':'rgba(255,255,255,.82)',
+  '--line':`color-mix(in srgb, ${fg} 11%, transparent)`,'--line-strong':`color-mix(in srgb, ${fg} 20%, transparent)`,
+  '--grid':`color-mix(in srgb, ${fg} 5%, transparent)`,'--shadow':'0 30px 70px -30px rgba(120,30,60,.28)',
+  '--grad-text':`linear-gradient(100deg,${fg} 0%,${hint} 40%,${a1} 72%,${a2} 100%)`,'--ok':'#2f9a66','color-scheme':'light'});
+const SITE_THEMES = {
+  dusty: light('#fff8f9','#fdeff3','#fbeaf0','#4b1528','#8a5a68','#993556','#d4537e','#b04a92','#c06a52','rgba(212,83,126,.22)','rgba(176,74,146,.16)','rgba(192,106,82,.14)','rgba(212,83,126,.14)'),
+  dark:  dark('#1a0a0e','#220d14','#2d1018','#fdf0f2','#c9a3ad','#f9c6d0','#e8748a','#c860a8','#d4806a','rgba(232,116,138,.32)','rgba(200,96,168,.26)','rgba(212,128,106,.18)','rgba(232,116,138,.18)'),
+  blush: light('#fff0f4','#ffe6ee','#ffffff','#3d0f20','#8c4a63','#a03058','#c84070','#e06a9a','#b0306a','rgba(200,64,112,.24)','rgba(224,106,154,.18)','rgba(176,48,106,.12)','rgba(200,64,112,.14)'),
+  mauve: dark('#150810','#1b0b16','#200d1a','#f5e0ee','#c7a2b9','#e8a0c8','#c860a8','#9b6fd8','#e8a0c8','rgba(200,96,168,.32)','rgba(155,111,216,.24)','rgba(232,160,200,.14)','rgba(200,96,168,.18)'),
+  noir:  dark('#0e0a0c','#141012','#1a1014','#faeae0','#c9b0a2','#e8b090','#d4806a','#b8566e','#e8b090','rgba(212,128,106,.30)','rgba(184,86,110,.22)','rgba(232,176,144,.14)','rgba(212,128,106,.18)'),
+};
+// Кольори телефона-демо для кожної теми (як у застосунку)
+const PHONE = {
+  dusty:{bg:'#fff8f9',bg2:'#fbeaf0',fg:'#4b1528',hint:'#993556',btn:'#d4537e'},
+  dark:{bg:'#1a0a0e',bg2:'#2d1018',fg:'#fdf0f2',hint:'#f9c6d0',btn:'#e8748a'},
+  blush:{bg:'#fff0f4',bg2:'#ffffff',fg:'#3d0f20',hint:'#a03058',btn:'#c84070'},
+  mauve:{bg:'#150810',bg2:'#200d1a',fg:'#f5e0ee',hint:'#e8a0c8',btn:'#c860a8'},
+  noir:{bg:'#0e0a0c',bg2:'#1a1014',fg:'#faeae0',hint:'#e8b090',btn:'#d4806a'},
+};
+const root = document.documentElement;
+let chosen = null, themingT = null;
+try { chosen = localStorage.getItem('beatybot_site_theme'); } catch(e) {}
+if (!SITE_THEMES[chosen]) chosen = null;
+function paint(key, animate){
+  if (animate && !reduce) { root.classList.add('theming'); clearTimeout(themingT); themingT = setTimeout(() => root.classList.remove('theming'), 650); }
+  const vars = key ? SITE_THEMES[key] : null;
+  Object.keys(SITE_THEMES.dark).forEach(k => vars ? root.style.setProperty(k, vars[k]) : root.style.removeProperty(k));
+  // Без вибору — основна тема сайту Deep Mauve
+  const pk = key || 'mauve';
+  const t = PHONE[pk];
+  phone.style.setProperty('--p-bg',t.bg); phone.style.setProperty('--p-bg2',t.bg2);
+  phone.style.setProperty('--p-fg',t.fg); phone.style.setProperty('--p-hint',t.hint); phone.style.setProperty('--p-btn',t.btn);
+  document.querySelectorAll('[data-site-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.siteTheme === pk)));
+}
+function choose(key){
+  chosen = key;
+  try { localStorage.setItem('beatybot_site_theme', key); } catch(e) {}
+  paint(key, true);
+}
+const canHover = matchMedia('(hover:hover) and (pointer:fine)').matches;
+document.querySelectorAll('[data-site-theme]').forEach(b => {
+  b.addEventListener('click', () => choose(b.dataset.siteTheme));
+  if (canHover) {
+    b.addEventListener('pointerenter', () => paint(b.dataset.siteTheme, true));
+    b.addEventListener('pointerleave', () => paint(chosen, true));
+  }
+});
+paint(chosen, false);
+
+const chat = document.getElementById('chat'), toast = document.getElementById('toast');
+const clients = [
+  {name:'Олена Коваль', nick:'olena_k', svc:'Манікюр з покриттям', price:'600 ₴', when:'чт, 20 листопада · 12:45–14:15'},
+  {name:'Марія Петрик', nick:'masha_p', svc:'Корекція брів', price:'350 ₴', when:'пт, 21 листопада · 10:00–10:45'},
+  {name:'Ірина Шевчук', nick:'iryna_sh', svc:'Педикюр', price:'700 ₴', when:'сб, 22 листопада · 15:30–17:00'},
+];
+let ci = 0;
+const SEP = '━━━━━━━━━━━━';
+function card(c, state){
+  const title = state === 'new' ? '🔔 Новий запис' : state === 'ok' ? '✅ Запис підтверджено' : '🌟 Візит завершено';
+  const foot = state === 'new' ? `<div class="sep">${SEP}</div><div class="foot">⏳ Очікує вашого підтвердження</div>` : '';
+  return `<div class="t">${title}</div><div class="sep">${SEP}</div>
+    <div>👤 <b>${c.name}</b></div><div>🔗 Нік: <span class="lnk">@${c.nick}</span></div>
+    <div>💅 ${c.svc} · ${c.price}</div><div>🗓 ${c.when}</div>${foot}<span class="time">${new Date().toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'})}</span>`;
+}
+function keyboard(state){
+  const nav = `<div class="kb-row"><button data-k="msg">💬 Написати клієнту</button><button data-k="sched">📅 Розклад</button></div>`;
+  if (state === 'new') return `<div class="kb-row"><button data-k="ok" class="pulse">✅ Підтвердити</button><button data-k="no">❌ Відхилити</button></div>` + nav;
+  if (state === 'ok') return nav + `<div class="kb-row"><button data-k="done">🌟 Завершити</button><button data-k="no">❌ Скасувати</button></div>`;
+  return nav;
+}
+let cur = null, timer = null;
+function flash(t){ toast.textContent = t; toast.classList.add('show'); clearTimeout(flash.t); flash.t = setTimeout(() => toast.classList.remove('show'), 1800); }
+function newBooking(){
+  const c = clients[ci++ % clients.length];
+  chat.innerHTML = `<span class="day">Сьогодні</span>`;
+  const m = document.createElement('div'); m.className = 'msg'; m.innerHTML = card(c,'new');
+  const k = document.createElement('div'); k.className = 'kb'; k.innerHTML = keyboard('new');
+  chat.append(m,k); cur = {c, m, k, state:'new'};
+}
+chat.addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]'); if(!b || !cur) return;
+  const k = b.dataset.k;
+  if (k === 'ok') { cur.state='ok'; cur.m.innerHTML = card(cur.c,'ok'); cur.k.innerHTML = keyboard('ok'); flash('Клієнтку повідомлено ✓'); }
+  else if (k === 'done') { cur.state='done'; cur.m.innerHTML = card(cur.c,'done'); cur.k.innerHTML = keyboard('done'); flash('Візит додано в аналітику'); schedule(); }
+  else if (k === 'no') { flash('Запис скасовано, час вільний'); schedule(900); }
+  else if (k === 'msg') flash(`Відкриваємо чат з @${cur.c.nick}`);
+  else if (k === 'sched') flash('Відкриваємо ваш розклад');
+});
+function schedule(ms=2600){ clearTimeout(timer); timer = setTimeout(newBooking, ms); }
+newBooking();
+
+/* ── Marquee ──────────────────────────────────────────────────────────── */
+const crafts = ['Манікюр','Педикюр','Брови','Вії','Стрижки','Фарбування','Масаж','Макіяж','Депіляція','Барбершоп','Косметологія','Нарощування','Укладки','Тату'];
+const track = document.getElementById('track');
+const half = crafts.map(c => `<span>${c}</span>`).join('');
+track.innerHTML = half + half;
+
+/* ── Bento: друк назви бота ───────────────────────────────────────────── */
+const names = ['anna_nails_bot','brows_by_kate_bot','lash_studio_uzh_bot','barber_max_bot','olya_beauty_bot'];
+const typed = document.getElementById('typed');
+if (reduce) typed.textContent = names[0];
+else (function typeLoop(n=0,i=0,del=false){
+  const w = names[n % names.length];
+  typed.textContent = w.slice(0,i);
+  let next = del ? 35 : 75;
+  if (!del && i === w.length){ next = 1600; del = true; }
+  else if (del && i === 0){ del = false; n++; next = 300; }
+  else i += del ? -1 : 1;
+  setTimeout(() => typeLoop(n,i,del), next);
+})();
+
+/* ── Bento: слоти заповнюються ────────────────────────────────────────── */
+const slotsEl = document.getElementById('slots');
+const times = ['09:00','10:30','12:00','13:30','15:00','16:30','18:00','19:30'];
+slotsEl.innerHTML = times.map(t => `<span class="slot">${t}</span>`).join('');
+const slotEls = [...slotsEl.children];
+[1,4,6].forEach(i => slotEls[i].classList.add('on'));
+if (!reduce) setInterval(() => {
+  const free = slotEls.filter(s => !s.classList.contains('on'));
+  if (free.length <= 1) slotEls.forEach((s,i) => s.classList.toggle('on', i === 2));
+  else free[Math.floor(Math.random()*free.length)].classList.add('on');
+}, 1700);
+
+/* ── Bento: графік ────────────────────────────────────────────────────── */
+const chartEl = document.getElementById('chart');
+const days = ['пн','вт','ср','чт','пт','сб','нд'];
+chartEl.innerHTML = days.map(d => `<div class="bar"><span></span></div>`).join('');
+function rollChart(){
+  [...chartEl.children].forEach((b,i) => {
+    const v = 600 + Math.round(Math.random()*2400/50)*50;
+    b.style.height = (v/3000*100) + '%';
+    b.querySelector('span').textContent = `${days[i]} · ${v} ₴`;
+  });
+}
+rollChart();
+chartEl.addEventListener('click', rollChart);
+chartEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rollChart(); } });
+if (!reduce) setInterval(rollChart, 4200);
+
+/* ── Bento: перемикач автопідтвердження ───────────────────────────────── */
+const sw = document.getElementById('swAuto'), swNote = document.getElementById('swNote');
+sw.addEventListener('click', () => {
+  const on = sw.getAttribute('aria-checked') !== 'true';
+  sw.setAttribute('aria-checked', String(on));
+  swNote.textContent = on ? 'Увімкнено: запис підтверджується одразу, клієнт отримує «чекаємо на вас».' : 'Вимкнено: ви підтверджуєте кожен запис кнопкою в чаті.';
+});
+
+/* ── Калькулятор ──────────────────────────────────────────────────────── */
+const PLANS = {1:{per:250,total:250},3:{per:225,total:675},12:{per:200,total:2400}};
+let plan = 12;
+const cRec = document.getElementById('cRec'), cMin = document.getElementById('cMin');
+const seg = document.getElementById('seg'), pill = seg.querySelector('.pill');
+let shown = 0;
+function animateNum(el, to){
+  const from = shown; shown = to;
+  if (reduce) { el.firstChild.nodeValue = to; return; }
+  const t0 = performance.now();
+  (function step(t){
+    const k = Math.min(1,(t - t0)/500), e = 1 - Math.pow(1-k,3);
+    el.firstChild.nodeValue = Math.round(from + (to-from)*e);
+    if (k < 1) requestAnimationFrame(step);
+  })(t0);
+}
+function fill(r){ r.style.setProperty('--p', ((r.value - r.min)/(r.max - r.min)*100) + '%'); }
+function calc(){
+  const rec = +cRec.value, min = +cMin.value;
+  document.getElementById('oRec').textContent = rec;
+  document.getElementById('oMin').textContent = min;
+  fill(cRec); fill(cMin);
+  const hours = Math.round(rec * 4.33 * min / 60);
+  const hoursEl = document.getElementById('hours');
+  animateNum(hoursEl, hours);
+  const word = (n => { const a=n%10,b=n%100; return (a===1&&b!==11)?'година':(a>=2&&a<=4&&(b<12||b>14))?'години':'годин'; })(hours);
+  hoursEl.querySelector('small').textContent = word;
+  const p = PLANS[plan];
+  document.getElementById('price').textContent = p.per + ' ₴';
+  document.getElementById('total').textContent = p.total + ' ₴';
+  document.getElementById('perHour').textContent = hours ? '≈ ' + Math.max(1, Math.round(p.per / hours)) + ' ₴' : '—';
+  const idx = {1:0,3:1,12:2}[plan];
+  pill.style.transform = `translateX(calc(${idx} * (100% + 4px)))`;
+}
+[cRec,cMin].forEach(r => r.addEventListener('input', calc));
+seg.addEventListener('click', e => {
+  const b = e.target.closest('button[data-plan]'); if(!b) return;
+  plan = +b.dataset.plan;
+  seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  calc();
+});
+calc();
+
+/* ── Форма запиту ─────────────────────────────────────────────────────── */
+const form = document.getElementById('reqForm'), out = document.getElementById('reqOut'), reqText = document.getElementById('reqText');
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const text = document.getElementById('rText');
+  if (!text.value.trim()) { text.focus(); text.setAttribute('aria-invalid','true'); text.placeholder = 'Напишіть кілька слів, щоб ми зрозуміли запит'; return; }
+  text.removeAttribute('aria-invalid');
+  const name = document.getElementById('rName').value.trim();
+  reqText.textContent = `Привіт, BeatyBOTI!${name ? ' Мене звати ' + name + '.' : ''}\nТема: ${document.getElementById('rType').value}\n\n${text.value.trim()}`;
+  out.classList.add('show');
+});
+document.getElementById('copyReq').addEventListener('click', e => {
+  const btn = e.currentTarget;
+  navigator.clipboard.writeText(reqText.textContent).then(() => { btn.textContent = 'Скопійовано ✓'; })
+    .catch(() => { const r = document.createRange(); r.selectNodeContents(reqText); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Виділено, натисніть Ctrl+C'; });
+});
+
+
+/* ── Анкета «Напишіть нам» ────────────────────────────────────────────── */
+const leadForm = document.getElementById('leadForm'), leadOut = document.getElementById('leadOut');
+const lSeg = document.getElementById('lSeg'), lPill = lSeg.querySelector('.pill');
+const lHandle = document.getElementById('lHandle'), lErr = document.getElementById('lHandleErr');
+let channel = 'instagram';
+const HANDLE_RULES = {
+  instagram: { re: /^[A-Za-z0-9._]{1,30}$/, ph: 'ваш_нік в Instagram', err: 'Нік в Instagram: латинські літери, цифри, крапка або _, до 30 символів.' },
+  telegram:  { re: /^[A-Za-z][A-Za-z0-9_]{4,31}$/, ph: 'ваш_нік в Telegram', err: 'Нік у Telegram: від 5 символів, латинські літери, цифри або _.' },
+};
+function setChannel(ch){
+  channel = ch;
+  lSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.ch === ch)));
+  lPill.style.transform = ch === 'telegram' ? 'translateX(calc(100% + 4px))' : 'none';
+  lHandle.placeholder = HANDLE_RULES[ch].ph;
+  lHandle.setAttribute('aria-label', ch === 'telegram' ? 'Нік у Telegram' : 'Нік в Instagram');
+  if (lHandle.value) validateHandle();
+}
+lSeg.addEventListener('click', e => { const b = e.target.closest('button[data-ch]'); if (b) setChannel(b.dataset.ch); });
+lSeg.addEventListener('keydown', e => {
+  if (!['ArrowLeft','ArrowRight'].includes(e.key)) return;
+  e.preventDefault(); const next = channel === 'instagram' ? 'telegram' : 'instagram';
+  setChannel(next); lSeg.querySelector(`[data-ch="${next}"]`).focus();
+});
+// Приймаємо також вставлене посилання: instagram.com/nick або t.me/nick
+function cleanHandle(v){
+  return v.trim().replace(/^(https?:\/\/)?(www\.)?(instagram\.com|t\.me|telegram\.me)\//i,'').replace(/[/?#].*$/,'').replace(/^@+/,'');
+}
+function validateHandle(){
+  const v = cleanHandle(lHandle.value), ok = HANDLE_RULES[channel].re.test(v);
+  lHandle.parentElement.classList.toggle('bad', !ok && !!lHandle.value);
+  lErr.textContent = !lHandle.value ? '' : ok ? '' : HANDLE_RULES[channel].err;
+  lHandle.setAttribute('aria-invalid', String(!ok));
+  return ok ? v : null;
+}
+lHandle.addEventListener('blur', validateHandle);
+lHandle.addEventListener('input', () => { if (lHandle.parentElement.classList.contains('bad')) validateHandle(); });
+
+leadForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const nameEl = document.getElementById('lName');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.focus(); nameEl.setAttribute('aria-invalid','true'); return; }
+  nameEl.removeAttribute('aria-invalid');
+  if (!lHandle.value.trim()) { lErr.textContent = 'Вкажіть нік, щоб ми могли вам написати.'; lHandle.parentElement.classList.add('bad'); lHandle.focus(); return; }
+  const handle = validateHandle(); if (!handle) { lHandle.focus(); return; }
+  const lead = {
+    name, channel, handle,
+    craft: document.getElementById('lCraft').value,
+    text: document.getElementById('lText').value.trim(),
+    source: 'site',
+    website: document.getElementById('lWebsite').value, // пастка для ботів
+  };
+  const btn = document.getElementById('lSubmit');
+  if (LEADS_ENDPOINT) {
+    btn.disabled = true; btn.textContent = 'Надсилаємо…';
+    try {
+      const r = await fetch(LEADS_ENDPOINT, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(lead) });
+      if (r.status === 400 || r.status === 429) {
+        const body = await r.json().catch(() => ({}));
+        const m = Array.isArray(body.message) ? body.message[0] : body.message;
+        btn.disabled = false; btn.textContent = 'Надіслати анкету';
+        lErr.textContent = m || 'Перевірте дані анкети.';
+        return;
+      }
+      if (!r.ok) throw new Error(r.status);
+      leadOut.innerHTML = `<span class="ok-title">Дякуємо, ${escapeHtml(name)}! ✨</span><span>Анкету отримали. Напишемо вам у ${channel === 'telegram' ? 'Telegram' : 'Instagram'} на <b>@${escapeHtml(handle)}</b> найближчим часом.</span>`;
+      leadOut.classList.add('show'); leadForm.querySelectorAll('input,textarea').forEach(i => i.value = '');
+      btn.textContent = 'Надіслано ✓';
+      return;
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Надіслати анкету';
+      // впадемо у запасний варіант нижче
+    }
+  }
+  // Запасний варіант: готовий текст, який можна надіслати нам у дірект.
+  const msg = `Привіт, BeatyBOTI! Мене звати ${name}.\nСфера: ${lead.craft}\n${channel === 'telegram' ? 'Telegram' : 'Instagram'}: @${handle}${lead.text ? '\n\n' + lead.text : ''}`;
+  leadOut.innerHTML = `<span class="ok-title">Майже готово</span>
+    <span>Скопіюйте текст і надішліть нам у дірект Instagram, ми відповімо на <b>@${escapeHtml(handle)}</b>.</span>
+    <pre id="leadText"></pre>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-ghost btn-sm" type="button" id="copyLead">Скопіювати</button>
+      <a class="btn btn-primary btn-sm" href="${INSTAGRAM_URL}" target="_blank" rel="noopener">Відкрити Instagram</a>
+    </div>`;
+  leadOut.querySelector('#leadText').textContent = msg;
+  leadOut.classList.add('show');
+  leadOut.querySelector('#copyLead').addEventListener('click', ev => {
+    const b = ev.currentTarget, pre = leadOut.querySelector('#leadText');
+    navigator.clipboard.writeText(msg).then(() => b.textContent = 'Скопійовано ✓')
+      .catch(() => { const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Виділено, натисніть Ctrl+C'; });
+  });
+});
+function escapeHtml(v){ return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ── Зміст юридичних сторінок ─────────────────────────────────────────── */
+[['tocP','[data-page=privacy] h2'],['tocT','[data-page=terms] h2']].forEach(([id,sel]) => {
+  const box = document.getElementById(id);
+  document.querySelectorAll(sel).forEach(h => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.textContent = h.textContent.replace(/^\d+\.\s*/,'');
+    b.addEventListener('click', () => h.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block:'start'}));
+    box.append(b);
+  });
+});
+document.querySelectorAll('.legal h2').forEach(h => h.style.scrollMarginTop = '110px');
+
+/* ── Гігантський футер: підбір розміру на всю ширину + світло за курсором ── */
+const giant = document.getElementById('giant');
+function fitGiant(){
+  const box = giant.parentElement, cs = getComputedStyle(box);
+  const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  giant.style.fontSize = '100px';
+  const w = giant.getBoundingClientRect().width;
+  if (w) giant.style.fontSize = Math.floor(100 * avail / w) + 'px';
+}
+fitGiant();
+addEventListener('resize', fitGiant);
+document.fonts && document.fonts.ready.then(fitGiant);
+giant.parentElement.parentElement.addEventListener('pointermove', e => {
+  const r = giant.getBoundingClientRect();
+  giant.style.setProperty('--gx', (e.clientX - r.left) + 'px');
+  giant.style.setProperty('--gy', (e.clientY - r.top) + 'px');
+});
+</script>
+</body>
+</html>
