@@ -49,3 +49,28 @@ test('master new-booking message contains client nick', async () => {
   assert.match(sent[0].text, /10:00/); // 08:00 UTC = 10:00 Київ
   assert.equal(sent[0].extra.parse_mode, 'HTML');
 });
+
+test('bot buttons: confirmed/cancelled message keeps client nick', async () => {
+  const { AppointmentCallbackHandler } = await import('../src/modules/bot/handlers/appointment-callback.handler');
+  const apt: any = {
+    id: 'a1', masterId: 'm1', status: 'confirmed',
+    client: { fullName: 'Аня <3', username: 'anna_nails', telegramId: '1' },
+    service: { name: 'Манікюр' }, slot: { startAt: new Date('2026-07-30T09:45:00Z') },
+  };
+  const repo: any = { findOne: async () => apt };
+  const h = new AppointmentCallbackHandler(repo, {} as any, {} as any, {} as any, {} as any);
+  const edits: string[] = [];
+  const ctx: any = {
+    answerCbQuery: async () => {}, callbackQuery: { data: 'confirm_apt:a1' },
+    editMessageText: async (t: string) => { edits.push(t); }, reply: async () => {},
+  };
+  await h.handle(ctx, 'm1');
+  apt.status = 'cancelled_master';
+  ctx.callbackQuery.data = 'cancel_apt:a1';
+  await h.handle(ctx, 'm1');
+  assert.equal(edits.length, 2);
+  for (const t of edits) {
+    assert.match(t, /@anna_nails/);
+    assert.match(t, /Аня &lt;3/);
+  }
+});
