@@ -6,6 +6,7 @@ import { Repository, DataSource, In } from 'typeorm';
 import { Appointment, AppointmentStatus } from '../../../database/entities/appointment.entity';
 import { Slot } from '../../../database/entities/slot.entity';
 import { AuditLog, AuditAction } from '../../../database/entities/audit-log.entity';
+import { escapeHtml, clientTelegramLine } from '../../../common/telegram-format';
 
 /**
  * Обробляє натискання inline кнопок підтвердження/скасування/завершення записів.
@@ -101,8 +102,9 @@ export class AppointmentCallbackHandler {
 
     const confirmedMsg = (a: Appointment) =>
       `✅ <b>Запис підтверджено</b>\n\n` +
-      `👤 ${a.client?.fullName ?? '—'}\n` +
-      `💅 ${a.service?.name ?? '—'}\n` +
+      `👤 ${escapeHtml(a.client?.fullName ?? '—')}\n` +
+      clientTelegramLine(a.client) +
+      `💅 ${escapeHtml(a.service?.name ?? '—')}\n` +
       `📅 ${this.fmtTime(a.slot?.startAt)}`;
     const confirmedExtra = {
       parse_mode: 'HTML',
@@ -163,8 +165,9 @@ export class AppointmentCallbackHandler {
 
     const cancelledMsg =
       `❌ <b>Запис скасовано</b>\n\n` +
-      `👤 ${apt.client?.fullName ?? '—'}\n` +
-      `💅 ${apt.service?.name ?? '—'}\n` +
+      `👤 ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
+      clientTelegramLine(apt.client) +
+      `💅 ${escapeHtml(apt.service?.name ?? '—')}\n` +
       `📅 ${this.fmtTime(apt.slot?.startAt)}`;
 
     // Скасувати можна лише активний запис.
@@ -228,8 +231,9 @@ export class AppointmentCallbackHandler {
 
     const doneMsg =
       `🌟 <b>Візит завершено!</b>\n\n` +
-      `👤 ${apt.client?.fullName ?? '—'}\n` +
-      `💅 ${apt.service?.name ?? '—'}\n` +
+      `👤 ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
+      clientTelegramLine(apt.client) +
+      `💅 ${escapeHtml(apt.service?.name ?? '—')}\n` +
       `💰 ${apt.pricePaid} ${apt.currency ?? 'UAH'}`;
 
     if (apt.status === AppointmentStatus.COMPLETED) {
