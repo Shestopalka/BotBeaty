@@ -60,6 +60,10 @@ export class NotificationProcessor extends WorkerHost {
     });
     if (!apt) return;
 
+    // Автопідтвердження: запис уже CONFIRMED на момент створення — тоді клієнту
+    // не пишемо «очікуємо», а майстру не даємо кнопку «Підтвердити».
+    const autoConfirmed = apt.status === AppointmentStatus.CONFIRMED;
+
     const slotTime = apt.slot.startAt.toLocaleString('uk-UA', {
       timeZone: 'Europe/Kyiv',
       dateStyle: 'long',
@@ -75,7 +79,7 @@ export class NotificationProcessor extends WorkerHost {
         `💅 Послуга: ${apt.service?.name ?? '—'}\n` +
         `📅 Дата: ${slotTime}\n` +
         `💰 Вартість: ${this.formatPrice(apt)}\n\n` +
-        `⏳ Очікуємо підтвердження майстра`,
+        (autoConfirmed ? `✅ Запис підтверджено — чекаємо на вас!` : `⏳ Очікуємо підтвердження майстра`),
         { parse_mode: 'HTML' },
       );
     } catch (e) {
@@ -84,7 +88,7 @@ export class NotificationProcessor extends WorkerHost {
 
     // Нотифікація майстру
     try {
-      const card = masterCard('new', apt, this.miniAppUrl);
+      const card = masterCard(autoConfirmed ? 'new_auto' : 'new', apt, this.miniAppUrl);
       await this.botService.sendToMaster(apt.master, card.text, card.extra);
     } catch (e) {
       this.logger.warn(`sendToMaster failed (masterId=${data.masterId}): ${e.message}`);

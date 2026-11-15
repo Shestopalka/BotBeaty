@@ -101,3 +101,31 @@ test('master card: layout, keyboard order, no tg:// in buttons', async () => {
   assert.ok(!all.includes('tg://') && !all.includes('t.me'));
   assert.match(noNick.text, /tg:\/\/user\?id=1/);
 });
+
+test('auto-confirm: master gets no «Підтвердити», client gets no «очікуємо»', async () => {
+  const sent: any[] = []; const toClient: string[] = [];
+  const apt: any = {
+    id: 'a2', status: 'confirmed', pricePaid: 500, currency: 'UAH',
+    client: { fullName: 'Аня', username: 'anna_nails', telegramId: '42' },
+    service: { name: 'Манікюр', priceType: 'fixed', price: 500 },
+    slot: { startAt: new Date('2026-11-14T08:00:00Z') }, master: { id: 'm1' },
+  };
+  const proc: any = Object.create(NotificationProcessor.prototype);
+  proc.logger = { warn: () => {} };
+  proc.appointmentRepo = { findOne: async () => apt };
+  proc.botService = {
+    sendToClient: async (_m: any, _c: any, t: string) => { toClient.push(t); },
+    sendToMaster: async (_m: any, text: string, extra: any) => { sent.push({ text, extra }); },
+  };
+  await proc.handleAppointmentCreated({ appointmentId: 'a2', masterId: 'm1', clientTelegramId: '42' });
+  const kb = JSON.stringify(sent[0].extra.reply_markup);
+  assert.ok(!kb.includes('confirm_apt:'));
+  assert.ok(kb.includes('complete_apt:a2') && kb.includes('cancel_apt:a2'));
+  assert.match(sent[0].text, /Підтверджено автоматично/);
+  assert.doesNotMatch(toClient[0], /Очікуємо/);
+
+  apt.status = 'pending'; sent.length = 0; toClient.length = 0;
+  await proc.handleAppointmentCreated({ appointmentId: 'a2', masterId: 'm1', clientTelegramId: '42' });
+  assert.ok(JSON.stringify(sent[0].extra.reply_markup).includes('confirm_apt:a2'));
+  assert.match(toClient[0], /Очікуємо/);
+});

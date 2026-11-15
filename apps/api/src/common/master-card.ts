@@ -15,10 +15,11 @@ type CardApt = {
   slot?: { startAt?: Date | string | null; endAt?: Date | string | null } | null;
 };
 
-export type CardKind = 'new' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'completed';
+export type CardKind = 'new' | 'new_auto' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'completed';
 
 const TITLES: Record<CardKind, string> = {
   new: '🔔 <b>Новий запис</b>',
+  new_auto: '🔔 <b>Новий запис</b>',
   confirmed: '✅ <b>Запис підтверджено</b>',
   cancelled: '❌ <b>Запис скасовано</b>',
   cancelled_by_client: '❌ <b>Клієнт скасував запис</b>',
@@ -27,6 +28,7 @@ const TITLES: Record<CardKind, string> = {
 
 const FOOTERS: Partial<Record<CardKind, string>> = {
   new: '⏳ <i>Очікує вашого підтвердження</i>',
+  new_auto: '✅ <i>Підтверджено автоматично</i>',
   cancelled_by_client: '<i>Час знову вільний для запису</i>',
   cancelled: '<i>Час знову вільний для запису</i>',
 };
@@ -96,7 +98,7 @@ export function masterCardKeyboard(kind: CardKind, apt: CardApt, miniAppUrl?: st
       { text: '❌ Відхилити', callback_data: `cancel_apt:${apt.id}` },
     ]);
     if (nav.length) rows.push(nav);
-  } else if (kind === 'confirmed') {
+  } else if (kind === 'confirmed' || kind === 'new_auto') {
     if (nav.length) rows.push(nav);
     rows.push([
       { text: '🌟 Завершити', callback_data: `complete_apt:${apt.id}` },
