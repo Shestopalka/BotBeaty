@@ -20,9 +20,11 @@ async function bootstrap() {
     }),
   );
 
-  // CORS для Mini App
+  // CORS: Mini App + сайт-лендинг (анкета «Напишіть нам» шле POST /leads).
+  const allowedOrigins = [process.env.MINI_APP_URL, ...(process.env.LANDING_URL ?? '').split(',')]
+    .map(s => s?.trim().replace(/\/+$/, '')).filter(Boolean) as string[];
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' ? process.env.MINI_APP_URL : true,
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Telegram-Init-Data', 'X-Master-Id'],
     credentials: true,

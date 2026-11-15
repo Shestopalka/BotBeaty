@@ -10,6 +10,7 @@ import { AuditLog } from './entities/audit-log.entity';
 import { Expense } from './entities/expense.entity';
 import { FunnelEvent } from './entities/funnel-event.entity';
 import { FeatureFlag } from './entities/feature-flag.entity';
+import { Lead } from './entities/lead.entity';
 
 dotenv.config();
 
@@ -26,7 +27,7 @@ export const AppDataSource = new DataSource({
         password: process.env.DATABASE_PASSWORD || 'beatybot_secret',
         database: process.env.DATABASE_NAME || 'beatybot_db',
       }),
-  entities: [Master, Client, Service, Slot, Appointment, Payment, AuditLog, Expense, FeatureFlag, FunnelEvent],
+  entities: [Master, Client, Service, Slot, Appointment, Payment, AuditLog, Expense, FeatureFlag, FunnelEvent, Lead],
   migrations: ['src/database/migrations/*.ts'],
   synchronize: false, // Тільки через міграції!
   logging: process.env.NODE_ENV === 'development',
