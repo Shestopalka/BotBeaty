@@ -45,7 +45,7 @@ test('master new-booking message contains client nick', async () => {
   await proc.handleAppointmentCreated({ appointmentId: 'a1', masterId: 'm1', clientTelegramId: '42' });
   assert.equal(sent.length, 1);
   assert.match(sent[0].text, /🔗 Нік: @anna_nails/);
-  assert.match(sent[0].text, /Клієнт: Аня &lt;3/);
+  assert.match(sent[0].text, /<b>Аня &lt;3<\/b>/);
   assert.match(sent[0].text, /10:00/); // 08:00 UTC = 10:00 Київ
   assert.equal(sent[0].extra.parse_mode, 'HTML');
 });
@@ -73,4 +73,31 @@ test('bot buttons: confirmed/cancelled message keeps client nick', async () => {
     assert.match(t, /@anna_nails/);
     assert.match(t, /Аня &lt;3/);
   }
+});
+
+test('master card: layout, keyboard order, no tg:// in buttons', async () => {
+  const { masterCard } = await import('../src/common/master-card');
+  const apt: any = {
+    id: 'a1', pricePaid: 600, currency: 'UAH',
+    client: { fullName: 'Анна', username: 'anna_nails', telegramId: '1', phone: '+380501112233' },
+    service: { name: 'Манікюр', priceType: 'fixed', price: 600 },
+    slot: { startAt: new Date('2026-07-30T09:45:00Z'), endAt: new Date('2026-07-30T11:15:00Z') },
+  };
+  const n = masterCard('new', apt, 'https://app.example');
+  assert.match(n.text, /чт, 30 липня · 12:45–14:15/);
+  assert.match(n.text, /Манікюр · 600 ₴/);
+  assert.equal(n.extra.reply_markup!.inline_keyboard[0][0].callback_data, 'confirm_apt:a1');
+  assert.equal(n.extra.reply_markup!.inline_keyboard[1][0].url, 'https://t.me/anna_nails');
+
+  // Підтверджений: перший ряд — безпечні кнопки (захист від подвійного тапу).
+  const c = masterCard('confirmed', apt, 'https://app.example');
+  const rows = c.extra.reply_markup!.inline_keyboard;
+  assert.ok(rows[0].every((b: any) => !b.callback_data));
+  assert.equal(rows[1][0].callback_data, 'complete_apt:a1');
+
+  // Без ніка — кнопки «Написати» немає (tg:// у кнопці Telegram може відхилити).
+  const noNick = masterCard('confirmed', { ...apt, client: { ...apt.client, username: null } }, null);
+  const all = JSON.stringify(noNick.extra.reply_markup);
+  assert.ok(!all.includes('tg://') && !all.includes('t.me'));
+  assert.match(noNick.text, /tg:\/\/user\?id=1/);
 });

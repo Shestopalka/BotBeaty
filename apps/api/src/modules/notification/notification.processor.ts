@@ -1,9 +1,10 @@
-import { escapeHtml, clientTelegramLine } from '../../common/telegram-format';
+import { masterCard, formatPrice } from '../../common/master-card';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { Master } from '../../database/entities/master.entity';
 import { BotService } from '../bot/bot.service';
@@ -18,18 +19,17 @@ export class NotificationProcessor extends WorkerHost {
     @InjectRepository(Master)
     private masterRepo: Repository<Master>,
     private botService: BotService,
+    @Optional() private config?: ConfigService,
   ) {
     super();
   }
 
-  /** "350 ₴" або "500–1000 ₴" — узгоджено з фронтом. */
   private formatPrice(apt: Appointment): string {
-    const cur = !apt.currency || apt.currency === 'UAH' ? '₴' : apt.currency;
-    const svc = apt.service;
-    if (svc?.priceType === 'range' && svc.priceMax != null) {
-      return `${Math.round(Number(svc.price))}–${Math.round(Number(svc.priceMax))} ${cur}`;
-    }
-    return `${Math.round(Number(apt.pricePaid))} ${cur}`;
+    return formatPrice(apt);
+  }
+
+  private get miniAppUrl(): string | undefined {
+    return this.config?.get<string>('miniApp.url') || undefined;
   }
 
   async process(job: Job) {
@@ -84,25 +84,8 @@ export class NotificationProcessor extends WorkerHost {
 
     // Нотифікація майстру
     try {
-      await this.botService.sendToMaster(
-        apt.master,
-        `🔔 <b>Новий запис!</b>\n\n` +
-        `👤 Клієнт: ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
-        clientTelegramLine(apt.client) +
-        (apt.client?.phone ? `📞 Телефон: ${escapeHtml(apt.client.phone)}\n` : '') +
-        `💅 Послуга: ${escapeHtml(apt.service?.name ?? '—')}\n` +
-        `📅 Час: ${slotTime}\n` +
-        `💰 Сума: ${this.formatPrice(apt)}`,
-        {
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [[
-              { text: '✅ Підтвердити', callback_data: `confirm_apt:${apt.id}` },
-              { text: '❌ Відхилити', callback_data: `cancel_apt:${apt.id}` },
-            ]],
-          },
-        },
-      );
+      const card = masterCard('new', apt, this.miniAppUrl);
+      await this.botService.sendToMaster(apt.master, card.text, card.extra);
     } catch (e) {
       this.logger.warn(`sendToMaster failed (masterId=${data.masterId}): ${e.message}`);
     }
@@ -146,18 +129,10 @@ export class NotificationProcessor extends WorkerHost {
       data.newStatus === AppointmentStatus.CANCELLED_CLIENT ||
       data.newStatus === AppointmentStatus.CANCELLED_MASTER;
     if (isCancel && apt.master) {
-      const time = apt.slot?.startAt
-        ? new Date(apt.slot.startAt).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' })
-        : '';
-      const who = data.newStatus === AppointmentStatus.CANCELLED_CLIENT ? 'Клієнт скасував запис' : 'Запис скасовано';
+      const kind = data.newStatus === AppointmentStatus.CANCELLED_CLIENT ? 'cancelled_by_client' : 'cancelled';
       try {
-        await this.botService.sendToMaster(
-          apt.master,
-          `❌ <b>${who}</b>\n👤 ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
-            clientTelegramLine(apt.client) +
-            `💅 ${escapeHtml(apt.service?.name ?? '—')}\n📅 ${time}`,
-          { parse_mode: 'HTML' },
-        );
+        const card = masterCard(kind, apt, this.miniAppUrl);
+        await this.botService.sendToMaster(apt.master, card.text, card.extra);
       } catch (e) {
         this.logger.warn(`sendToMaster (cancel) failed: ${e.message}`);
       }

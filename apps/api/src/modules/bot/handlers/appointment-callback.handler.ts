@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,7 +7,7 @@ import { Repository, DataSource, In } from 'typeorm';
 import { Appointment, AppointmentStatus } from '../../../database/entities/appointment.entity';
 import { Slot } from '../../../database/entities/slot.entity';
 import { AuditLog, AuditAction } from '../../../database/entities/audit-log.entity';
-import { escapeHtml, clientTelegramLine } from '../../../common/telegram-format';
+import { masterCard, CardKind } from '../../../common/master-card';
 
 /**
  * Обробляє натискання inline кнопок підтвердження/скасування/завершення записів.
@@ -40,7 +41,14 @@ export class AppointmentCallbackHandler {
     private dataSource: DataSource,
     @InjectQueue('notifications')
     private notificationsQueue: Queue,
+    @Optional() private config?: ConfigService,
   ) {}
+
+  /** Перемальовує повідомлення в єдину картку запису (з ніком клієнта та кнопками). */
+  private async showCard(ctx: any, kind: CardKind, apt: Appointment) {
+    const c = masterCard(kind, apt, this.config?.get<string>('miniApp.url'));
+    await this.safeEdit(ctx, c.text, c.extra);
+  }
 
   async handle(ctx: any, masterId: string): Promise<void> {
     // Підтверджуємо callback МИТТЄВО (до будь-яких запитів у БД), щоб кнопка
@@ -100,25 +108,9 @@ export class AppointmentCallbackHandler {
     });
     if (!apt) { await this.safeReply(ctx, '❌ Запис не знайдено'); return; }
 
-    const confirmedMsg = (a: Appointment) =>
-      `✅ <b>Запис підтверджено</b>\n\n` +
-      `👤 ${escapeHtml(a.client?.fullName ?? '—')}\n` +
-      clientTelegramLine(a.client) +
-      `💅 ${escapeHtml(a.service?.name ?? '—')}\n` +
-      `📅 ${this.fmtTime(a.slot?.startAt)}`;
-    const confirmedExtra = {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[
-          { text: '✅ Завершити', callback_data: `complete_apt:${apt.id}` },
-          { text: '❌ Скасувати', callback_data: `cancel_apt:${apt.id}` },
-        ]],
-      },
-    };
-
     // Ідемпотентність: якщо вже підтверджено — просто (best-effort) показуємо стан.
     if (apt.status === AppointmentStatus.CONFIRMED) {
-      await this.safeEdit(ctx, confirmedMsg(apt), confirmedExtra);
+      await this.showCard(ctx, 'confirmed', apt);
       return;
     }
     if (apt.status !== AppointmentStatus.PENDING) {
@@ -151,7 +143,7 @@ export class AppointmentCallbackHandler {
       newStatus: AppointmentStatus.CONFIRMED,
     }).catch(e => this.logger.warn(`Нотифікація підтвердження: ${e.message}`));
 
-    await this.safeEdit(ctx, confirmedMsg(apt), confirmedExtra);
+    await this.showCard(ctx, 'confirmed', apt);
   }
 
   // ─── Cancel ──────────────────────────────────────────────────────────────
@@ -163,13 +155,6 @@ export class AppointmentCallbackHandler {
     });
     if (!apt) { await this.safeReply(ctx, '❌ Запис не знайдено'); return; }
 
-    const cancelledMsg =
-      `❌ <b>Запис скасовано</b>\n\n` +
-      `👤 ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
-      clientTelegramLine(apt.client) +
-      `💅 ${escapeHtml(apt.service?.name ?? '—')}\n` +
-      `📅 ${this.fmtTime(apt.slot?.startAt)}`;
-
     // Скасувати можна лише активний запис.
     if (
       apt.status !== AppointmentStatus.PENDING &&
@@ -180,7 +165,7 @@ export class AppointmentCallbackHandler {
         apt.status === AppointmentStatus.CANCELLED_MASTER ||
         apt.status === AppointmentStatus.CANCELLED_CLIENT
       ) {
-        await this.safeEdit(ctx, cancelledMsg, { parse_mode: 'HTML' });
+        await this.showCard(ctx, 'cancelled', apt);
       } else {
         await this.safeReply(ctx, 'ℹ️ Цей запис уже завершено — скасувати не можна.');
       }
@@ -217,7 +202,7 @@ export class AppointmentCallbackHandler {
       newStatus: AppointmentStatus.CANCELLED_MASTER,
     }).catch(e => this.logger.warn(`Нотифікація скасування: ${e.message}`));
 
-    await this.safeEdit(ctx, cancelledMsg, { parse_mode: 'HTML' });
+    await this.showCard(ctx, 'cancelled', apt);
   }
 
   // ─── Complete ────────────────────────────────────────────────────────────
@@ -229,15 +214,8 @@ export class AppointmentCallbackHandler {
     });
     if (!apt) { await this.safeReply(ctx, '❌ Запис не знайдено'); return; }
 
-    const doneMsg =
-      `🌟 <b>Візит завершено!</b>\n\n` +
-      `👤 ${escapeHtml(apt.client?.fullName ?? '—')}\n` +
-      clientTelegramLine(apt.client) +
-      `💅 ${escapeHtml(apt.service?.name ?? '—')}\n` +
-      `💰 ${apt.pricePaid} ${apt.currency ?? 'UAH'}`;
-
     if (apt.status === AppointmentStatus.COMPLETED) {
-      await this.safeEdit(ctx, doneMsg, { parse_mode: 'HTML' });
+      await this.showCard(ctx, 'completed', apt);
       return;
     }
     // Завершити можна лише підтверджений (або ще pending) активний запис.
@@ -271,6 +249,6 @@ export class AppointmentCallbackHandler {
       newStatus: AppointmentStatus.COMPLETED,
     }).catch(e => this.logger.warn(`Нотифікація завершення: ${e.message}`));
 
-    await this.safeEdit(ctx, doneMsg, { parse_mode: 'HTML' });
+    await this.showCard(ctx, 'completed', apt);
   }
 }
